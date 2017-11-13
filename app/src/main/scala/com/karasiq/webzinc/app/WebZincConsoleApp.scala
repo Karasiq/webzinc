@@ -14,7 +14,7 @@ import akka.stream.ActorMaterializer
 import com.karasiq.webzinc.fetcher.WebResourceFetcher
 import com.karasiq.webzinc.inliner.WebResourceInliner
 
-object ConsoleApp extends App {
+object WebZincConsoleApp extends App {
   implicit val actorSystem = ActorSystem()
   implicit val materializer = ActorMaterializer()
   val fetcher = WebResourceFetcher()
