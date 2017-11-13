@@ -20,19 +20,19 @@ object WebZincConsoleApp extends App {
   val fetcher = WebResourceFetcher()
   val inliner = WebResourceInliner()
 
-  args.foreach { url ⇒
-    println(s"Loading: $url")
-    val (page, resources) = Await.result(fetcher.getWebPage(url), Duration.Inf)
-    val processedPage = Await.result(inliner.inline(page, resources), Duration.Inf)
-    
-    def validFileName(str: String) = {
-      val forbiddenChars = """[<>:"/\\|?*]""".r
-      forbiddenChars.replaceAllIn(str, "_")
+  try {
+    args.foreach { url ⇒
+      println(s"Loading: $url")
+      val (page, resources) = Await.result(fetcher.getWebPage(url), Duration.Inf)
+      val processedPage = Await.result(inliner.inline(page, resources), Duration.Inf)
+
+      def validFileName(str: String) = {
+        val forbiddenChars = """[<>:"/\\|?*]""".r
+        forbiddenChars.replaceAllIn(str, "_")
+      }
+
+      // Files.write(Paths.get(s"${validFileName(page.title)} [${Integer.toHexString(page.url.hashCode)}]_orig.html"), Seq(page.html).asJava)
+      Files.write(Paths.get(s"${validFileName(page.title)} [${Integer.toHexString(page.url.hashCode)}].html"), Seq(processedPage.html).asJava)
     }
-
-    // Files.write(Paths.get(s"${validFileName(page.title)} [${Integer.toHexString(page.url.hashCode)}]_orig.html"), Seq(page.html).asJava)
-    Files.write(Paths.get(s"${validFileName(page.title)} [${Integer.toHexString(page.url.hashCode)}].html"), Seq(processedPage.html).asJava)
-  }
-
-  actorSystem.terminate()
+  } finally actorSystem.terminate()
 }
