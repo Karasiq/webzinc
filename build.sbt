@@ -2,7 +2,7 @@ val baseName = "webzinc"
 
 lazy val commonSettings = Seq(
   organization := "com.github.karasiq",
-  version := "1.0.0-SNAPSHOT",
+  version := "1.0.0",
   isSnapshot := version.value.endsWith("-SNAPSHOT"),
   scalaVersion := "2.12.3"
 )
@@ -11,6 +11,16 @@ val packageSettings = Seq(
   // javaOptions in Universal += "-Xmx2G",
   name in Universal := baseName,
   version in Universal := version.value.replace("-SNAPSHOT", ""),
+  executableScriptName := baseName,
+  mappings in Universal := {
+    val universalMappings = (mappings in Universal).value
+    val fatJar = (assembly in Compile).value
+    val filtered = universalMappings.filterNot(_._2.endsWith(".jar"))
+    filtered :+ (fatJar → ("lib/" + fatJar.getName))
+  },
+  test in assembly := {},
+  assemblyJarName in assembly := s"$baseName.jar",
+  scriptClasspath := Seq((jarName in assembly).value),
   maintainer := "Karasiq",
   packageSummary := "WebZinc",
   packageDescription := "WebZinc - web page archival utility.",
@@ -60,7 +70,7 @@ lazy val core = project
   )
 
 lazy val app = project
-  .settings(commonSettings, packageSettings, noPublishSettings, name := baseName)
+  .settings(commonSettings, packageSettings, noPublishSettings, name := s"$baseName-app")
   .dependsOn(core)
   .enablePlugins(JavaAppPackaging, ClasspathJarPlugin, JDKPackagerPlugin)
   
