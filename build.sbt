@@ -72,7 +72,7 @@ lazy val core = project
 lazy val app = project
   .settings(commonSettings, packageSettings, noPublishSettings, name := s"$baseName-app")
   .dependsOn(core)
-  .enablePlugins(JavaAppPackaging, ClasspathJarPlugin, JDKPackagerPlugin)
+  .enablePlugins(JavaAppPackaging /*, ClasspathJarPlugin, JDKPackagerPlugin*/)
   
 lazy val root = project
   .settings(commonSettings, noPublishSettings, name := s"$baseName-root")
