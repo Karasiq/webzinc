@@ -19,7 +19,7 @@ private[fetcher] class HtmlUnitWebResourceFetcher(implicit ec: ExecutionContext)
 
   def getWebPage(url: String) = Future {
     def needToSave(url: String) = {
-      val extensionsToSave = Set("jpg", "jpeg", "png", "tif", "tiff", "pdf", "doc", "rtf", "webm", "mp4")
+      val extensionsToSave = Set("jpg", "jpeg", "png", "tif", "tiff", "pdf", "doc", "rtf", "webm", "mp4", "mp3", "ogg", "ogv", "flac")
       val extension = {
         val dotIndex = url.lastIndexOf('.')
         if (dotIndex == -1) "" else url.substring(dotIndex + 1)
@@ -47,6 +47,9 @@ private[fetcher] class HtmlUnitWebResourceFetcher(implicit ec: ExecutionContext)
         val images = page.elementsByTagName[HtmlImage]("img").map(_.getSrcAttribute)
         val videos = page.elementsByTagName[HtmlVideo]("video").flatMap { video ⇒
           video.getAttribute("src") :: video.subElementsByTagName[HtmlSource]("source").map(_.getAttribute("src")).toList
+        }
+        val audios = page.elementsByTagName[HtmlAudio]("audio").flatMap { audio ⇒
+          audio.getAttribute("src") :: audio.subElementsByTagName[HtmlSource]("source").map(_.getAttribute("src")).toList
         }
         val scripts = page.elementsByTagName[HtmlScript]("script").map(_.getSrcAttribute)
         val linked = page.elementsByTagName[HtmlLink]("link").map(_.getHrefAttribute)

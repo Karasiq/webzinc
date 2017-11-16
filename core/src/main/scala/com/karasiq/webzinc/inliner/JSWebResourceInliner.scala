@@ -50,7 +50,11 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |            html: 'text/html',
       |            htm: 'text/htm',
       |            webm: 'video/webm',
-      |            mp4: 'video/mp4'
+      |            mp4: 'video/mp4',
+      |            ogv: 'video/ogv',
+      |            mp3: 'audio/mp3',
+      |            flac: 'audio/flac',
+      |            ogg: 'audio/ogg'
       |        };
       |
       |        for (var type in types) if (url.endsWith("." + type)) return types[type];
@@ -93,7 +97,7 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |        for (var i = 0; i < list.length; i++) f(list[i]);
       |    }
       |
-      |    ["a", "source", "video", "img", "script", "link"].forEach(function (name) {
+      |    ["a", "source", "video", "audio", "img", "script", "link"].forEach(function (name) {
       |        foreach(document.getElementsByTagName(name), processGenericElement);
       |    });
       |
