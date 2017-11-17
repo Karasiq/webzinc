@@ -4,7 +4,7 @@ val baseName = "webzinc"
 
 lazy val commonSettings = Seq(
   organization := "com.github.karasiq",
-  version := "1.0.0",
+  version := "1.0.1",
   isSnapshot := version.value.endsWith("-SNAPSHOT"),
   scalaVersion := "2.12.3"
 )
