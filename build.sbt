@@ -1,3 +1,5 @@
+
+
 val baseName = "webzinc"
 
 lazy val commonSettings = Seq(
@@ -27,7 +29,13 @@ val packageSettings = Seq(
   jdkAppIcon := Some(file("setup/icon.ico")),
   jdkPackagerType := "installer",
   jdkPackagerJVMArgs := Seq("-Xmx2G"),
-  jdkPackagerProperties := Map("app.name" -> baseName, "app.version" -> version.value.replace("-SNAPSHOT", ""))
+  jdkPackagerProperties := Map("app.name" -> baseName, "app.version" -> version.value.replace("-SNAPSHOT", "")),
+  // general package information (can be scoped to Windows)
+  maintainer := "Karasiq <karasiq@airmail.cc>",
+  packageSummary := "webzinc",
+  packageDescription := """WebZinc application.""",
+  wixProductId := "75bc6d56-5775-4a07-a006-1b1c75aefc3e",
+  wixProductUpgradeId := "5cc0ee85-0c77-4059-9ea0-6b872b7739bd"
 )
 
 lazy val publishSettings = Seq(
@@ -72,7 +80,7 @@ lazy val core = project
 lazy val app = project
   .settings(commonSettings, packageSettings, noPublishSettings, name := s"$baseName-app")
   .dependsOn(core)
-  .enablePlugins(JavaAppPackaging /*, ClasspathJarPlugin, JDKPackagerPlugin*/)
+  .enablePlugins(JavaAppPackaging, WindowsPlugin /*, ClasspathJarPlugin, JDKPackagerPlugin*/)
   
 lazy val root = project
   .settings(commonSettings, noPublishSettings, name := s"$baseName-root")
