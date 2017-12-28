@@ -1,12 +1,11 @@
-
-
 val baseName = "webzinc"
 
 lazy val commonSettings = Seq(
   organization := "com.github.karasiq",
   version := "1.0.1",
   isSnapshot := version.value.endsWith("-SNAPSHOT"),
-  scalaVersion := "2.12.3"
+  scalaVersion := "2.12.3",
+  crossScalaVersions := Seq("2.11.11", "2.12.3")
 )
 
 val packageSettings = Seq(
@@ -73,7 +72,8 @@ lazy val noPublishSettings = Seq(
 lazy val core = project
   .settings(
     commonSettings,
-    name := s"$baseName-core",
+    publishSettings,
+    name := baseName,
     libraryDependencies ++= ProjectDeps.akka.all ++ ProjectDeps.commonsNetwork ++ ProjectDeps.htmlUnit ++ ProjectDeps.jsoup ++ ProjectDeps.scalaTest.map(_ % "test")
   )
 
