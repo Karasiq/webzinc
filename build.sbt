@@ -1,11 +1,13 @@
 val baseName = "webzinc"
 
+scalaVersion := "2.12.3"
+
+crossScalaVersions += "2.11.11"
+
 lazy val commonSettings = Seq(
   organization := "com.github.karasiq",
   version := "1.0.1",
-  isSnapshot := version.value.endsWith("-SNAPSHOT"),
-  scalaVersion := "2.12.3",
-  crossScalaVersions := Seq("2.11.11", "2.12.3")
+  isSnapshot := version.value.endsWith("-SNAPSHOT")
 )
 
 val packageSettings = Seq(
@@ -21,7 +23,7 @@ val packageSettings = Seq(
   },
   test in assembly := {},
   assemblyJarName in assembly := s"$baseName.jar",
-  scriptClasspath := Seq((jarName in assembly).value),
+  scriptClasspath := Seq((assemblyJarName in assembly).value),
   maintainer := "Karasiq",
   packageSummary := "WebZinc",
   packageDescription := "WebZinc - web page archival utility.",
@@ -82,6 +84,6 @@ lazy val app = project
   .dependsOn(core)
   .enablePlugins(JavaAppPackaging, WindowsPlugin /*, ClasspathJarPlugin, JDKPackagerPlugin*/)
   
-lazy val root = project
+lazy val `webzinc` = (project in file("."))
   .settings(commonSettings, noPublishSettings, name := s"$baseName-root")
   .aggregate(app)
