@@ -9,8 +9,10 @@ import org.jsoup.Jsoup
 import com.karasiq.webzinc.model.{WebPage, WebResources}
 
 private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends WebResourceInliner {
-  protected def header =
-    s"""var webzinc_resources = {};"""
+  protected def header(page: WebPage) =
+    s"""var webzinc_origin = new URL('${page.url}');
+       |var webzinc_resources = {};
+       |""".stripMargin
 
   protected def initScript =
     """
@@ -57,16 +59,24 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |            ogg: 'audio/ogg'
       |        };
       |
-      |        for (var type in types) if (url.endsWith("." + type)) return types[type];
+      |        for (var type in types) if (url.endsWith('.' + type)) return types[type];
       |    }
       |
       |    function processGenericElement(e) {
+      |        function toAbsoluteURL(url) {
+      |           if (url.startsWith('/')) return webzinc_origin.origin + url;
+      |           else return webzinc_origin.origin + '/' + url;
+      |        }
+      |
       |        function replaceAttr(e, attr) {
       |            var url = e.getAttribute(attr);
       |            var data = webzinc_resources[url];
       |            if (data !== undefined) {
-      |                // e.setAttribute('orig-' + attr, url);
+      |                e.setAttribute('orig-' + attr, url);
       |                e.setAttribute(attr, base64ToUrl(data, getContentType(url)));
+      |            } else if (url && !url.contains('://') && !url.startsWith('javascript:') && !url.startsWith('#')) {
+      |                e.setAttribute('orig-' + attr, url);
+      |                e.setAttribute(attr, toAbsoluteURL(url));
       |            }
       |        }
       |
@@ -74,69 +84,52 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |        replaceAttr(e, "src");
       |    }
       |
-      |    /* function processScript(e) {
-      |        if (e.src && webzinc_resources[e.src]) {
-      |            e.appendChild(document.createTextNode(atob(webzinc_resources[e.getAttribute('src')])));
-      |            e.removeAttribute('src');
-      |        }
-      |    }
-      |
-      |    function processLink(e) {
-      |        if (e.href && webzinc_resources[e.href]) {
-      |            if (e.rel === "stylesheet") {
-      |                var style = document.createElement("style");
-      |                style.appendChild(document.createTextNode(atob(webzinc_resources[e.getAttribute('href')])));
-      |                e.parentNode.replaceChild(style, e);
-      |            } else {
-      |                processGenericElement(e);
-      |            }
-      |        }
-      |    } */
-      |
       |    function foreach(list, f) {
       |        for (var i = 0; i < list.length; i++) f(list[i]);
       |    }
       |
-      |    ["a", "source", "video", "audio", "img", "script", "link"].forEach(function (name) {
+      |    ['a', 'source', 'video', 'audio', 'img', 'script', 'link'].forEach(function (name) {
       |        foreach(document.getElementsByTagName(name), processGenericElement);
       |    });
-      |
-      |    // foreach(document.getElementsByTagName("script"), processScript);
-      |    // foreach(document.getElementsByTagName("link"), processLink);
       |});
     """.stripMargin
 
-  def inline(page: WebPage, resources: WebResources) = {
-    val resourceBytes = resources.flatMapMerge(3, { resource ⇒
-      resource.dataStream
-        .fold(ByteString.empty)(_ ++ _)
-        .map((resource.url, _))
-        .log("fetched-resources", { case (url, data) ⇒ url + " (" + data.length + " bytes)"})
-    })
-    .addAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
+  protected def insertScript(html: String, script: String): String = {
+    val parsedPage = Jsoup.parse(html)
+    val scripts = parsedPage.head().getElementsByTag("script")
+    if (scripts.isEmpty) {
+      parsedPage.head().append("<script>" + script + "</script>")
+    } else {
+      scripts.first().before("<script>" + script + "</script>")
+    }
 
+    // Fix charset
+    Option(parsedPage.head().selectFirst("meta[charset]"))
+      .getOrElse(parsedPage.head().prependElement("meta"))
+      .attr("charset", "utf-8")
+
+    parsedPage.outerHtml()
+  }
+
+  def inline(page: WebPage, resources: WebResources) = {
+    @inline
     def base64(data: ByteString) = Base64.getEncoder.encodeToString(data.toArray)
 
-    Source.single(header)
+    val resourceBytes = resources
+      .filter(r ⇒ !Set("", "/", page.url).contains(r.url))
+      .flatMapMerge(3, { resource ⇒
+        resource.dataStream
+          .fold(ByteString.empty)(_ ++ _)
+          .map((resource.url, _))
+          .log("fetched-resources", { case (url, data) ⇒ url + " (" + data.length + " bytes)"})
+      })
+      .addAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
+
+    Source.single(header(page))
       .concat(resourceBytes.map { case (url, bytes) ⇒ s"webzinc_resources['$url'] = '${base64(bytes)}';" })
       .concat(Source.single(initScript))
       .fold("")(_ + "\n" + _)
-      .map { script ⇒
-        val parsedPage = Jsoup.parse(page.html)
-        val scripts = parsedPage.head().getElementsByTag("script")
-        if (scripts.isEmpty) {
-          parsedPage.head().append("<script>" + script + "</script>")
-        } else {
-          scripts.first().before("<script>" + script + "</script>")
-        }
-
-        // Fix charset
-        Option(parsedPage.head().selectFirst("meta[charset]"))
-          .getOrElse(parsedPage.head().prependElement("meta"))
-          .attr("charset", "utf-8")
-
-        page.copy(html = parsedPage.outerHtml())
-      }
+      .map(script ⇒ page.copy(html = insertScript(page.html, script)))
       .runWith(Sink.head)
   }
 }

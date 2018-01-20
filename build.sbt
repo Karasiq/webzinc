@@ -1,16 +1,14 @@
 val baseName = "webzinc"
 
-scalaVersion := "2.12.3"
-
-crossScalaVersions += "2.11.11"
-
 lazy val commonSettings = Seq(
+  scalaVersion := "2.12.3",
+  crossScalaVersions += "2.11.11",
   organization := "com.github.karasiq",
   version := "1.0.1",
   isSnapshot := version.value.endsWith("-SNAPSHOT")
 )
 
-val packageSettings = Seq(
+lazy val packageSettings = Seq(
   // javaOptions in Universal += "-Xmx2G",
   name in Universal := baseName,
   version in Universal := version.value.replace("-SNAPSHOT", ""),
