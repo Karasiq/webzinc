@@ -4,7 +4,7 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.12.3",
   crossScalaVersions += "2.11.11",
   organization := "com.github.karasiq",
-  version := "1.0.1",
+  version := "1.0.2",
   isSnapshot := version.value.endsWith("-SNAPSHOT")
 )
 
@@ -27,7 +27,7 @@ lazy val packageSettings = Seq(
   packageDescription := "WebZinc - web page archival utility.",
   jdkAppIcon := Some(file("setup/icon.ico")),
   jdkPackagerType := "installer",
-  jdkPackagerJVMArgs := Seq("-Xmx2G"),
+  // jdkPackagerJVMArgs := Seq("-Xmx2G"),
   jdkPackagerProperties := Map("app.name" -> baseName, "app.version" -> version.value.replace("-SNAPSHOT", "")),
   // general package information (can be scoped to Windows)
   maintainer := "Karasiq <karasiq@airmail.cc>",
