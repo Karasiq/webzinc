@@ -17,13 +17,16 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
   protected def initScript =
     """
       |document.addEventListener("DOMContentLoaded", function () {
-      |    function base64ToUrl(b64Data, contentType, sliceSize) {
+      |    function getResourceData(url) {
+      |        var b64Data = webzinc_resources[url];
+      |        if (b64Data !== undefined) return atob(b64Data);
+      |    }
+      |
+      |    function dataToUrl(byteCharacters, contentType, sliceSize) {
       |        contentType = contentType || '';
       |        sliceSize = sliceSize || 512;
       |
-      |        var byteCharacters = atob(b64Data);
       |        var byteArrays = [];
-      |
       |        for (var offset = 0; offset < byteCharacters.length; offset += sliceSize) {
       |            var slice = byteCharacters.slice(offset, offset + sliceSize);
       |
@@ -40,12 +43,19 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |        return URL.createObjectURL(blob);
       |    }
       |
+      |    function toAbsoluteURL(url) {
+      |       if (url.contains('://') || url.startsWith('javascript:')) return url;
+      |       else if (url.startsWith('/')) return webzinc_origin.origin + url;
+      |       else return webzinc_origin.origin + '/' + url;
+      |    }
+      |
       |    function getContentType(url) {
       |        var types = {
       |            png: 'image/png',
       |            jpg: 'image/jpeg',
       |            jpeg: 'image/jpeg',
       |            gif: 'image/gif',
+      |            svg: 'image/svg+xml',
       |            pdf: 'application/pdf',
       |            js: 'text/javascript',
       |            css: 'text/css',
@@ -59,21 +69,30 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |            ogg: 'audio/ogg'
       |        };
       |
-      |        for (var type in types) if (url.endsWith('.' + type)) return types[type];
+      |        var file = url;
+      |        try { file = new URL(toAbsoluteURL(url)).pathname; } catch (e) { }
+      |        for (var type in types) if (file.endsWith('.' + type)) return types[type];
+      |    }
+      |
+      |    function processCssLinks(style) {
+      |        var regex = /url\(['\"]([^\"']+)[\"']\)/g;
+      |        var result = style.replace(regex, function (match, url) {
+      |            var data = getResourceData(url);
+      |            if (data !== undefined) return 'url("' + dataToUrl(data, getContentType(url)) + '")';
+      |            else return match;
+      |        });
+      |        return result;
       |    }
       |
       |    function processGenericElement(e) {
-      |        function toAbsoluteURL(url) {
-      |           if (url.startsWith('/')) return webzinc_origin.origin + url;
-      |           else return webzinc_origin.origin + '/' + url;
-      |        }
-      |
       |        function replaceAttr(e, attr) {
       |            var url = e.getAttribute(attr);
-      |            var data = webzinc_resources[url];
+      |            var data = getResourceData(url);
       |            if (data !== undefined) {
       |                e.setAttribute('orig-' + attr, url);
-      |                e.setAttribute(attr, base64ToUrl(data, getContentType(url)));
+      |                var contentType = getContentType(url);
+      |                if (contentType == 'text/css') data = processCssLinks(data);
+      |                e.setAttribute(attr, dataToUrl(data, contentType));
       |            } else if (url && !url.contains('://') && !url.startsWith('javascript:') && !url.startsWith('#')) {
       |                e.setAttribute('orig-' + attr, url);
       |                e.setAttribute(attr, toAbsoluteURL(url));
@@ -84,6 +103,10 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |        replaceAttr(e, "src");
       |    }
       |
+      |    function processStyle(style) {
+      |        style.textContent = processCssLinks(style.textContent);
+      |    }
+      |
       |    function foreach(list, f) {
       |        for (var i = 0; i < list.length; i++) f(list[i]);
       |    }
@@ -91,6 +114,8 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |    ['a', 'source', 'video', 'audio', 'img', 'script', 'link'].forEach(function (name) {
       |        foreach(document.getElementsByTagName(name), processGenericElement);
       |    });
+      |
+      |    foreach(document.getElementsByTagName('style'), processStyle);
       |});
     """.stripMargin
 
