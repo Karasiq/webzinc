@@ -69,9 +69,12 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |            ogg: 'audio/ogg'
       |        };
       |
-      |        var file = url;
+      |        var file = url || '';
       |        try { file = new URL(toAbsoluteURL(url)).pathname; } catch (e) { }
-      |        for (var type in types) if (file.endsWith('.' + type)) return types[type];
+      |
+      |        var parts = file.split('.');
+      |        var extension = parts[parts.length - 1];
+      |        return types[extension];
       |    }
       |
       |    function processCssLinks(style) {
