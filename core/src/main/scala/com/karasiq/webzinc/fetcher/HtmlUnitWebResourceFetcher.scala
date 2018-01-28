@@ -15,6 +15,7 @@ import com.gargoylesoftware.htmlunit.html._
 import com.karasiq.networkutils.HtmlUnitUtils
 import com.karasiq.networkutils.url._
 import com.karasiq.webzinc.model.{WebPage, WebResource}
+import com.karasiq.webzinc.utils.WebZincUtils
 
 private[fetcher] class HtmlUnitWebResourceFetcher(implicit ec: ExecutionContext) extends WebResourceFetcher {
   import HtmlUnitUtils._
@@ -36,25 +37,9 @@ private[fetcher] class HtmlUnitWebResourceFetcher(implicit ec: ExecutionContext)
 
       def cssResources(cssUrl: String, urls: Seq[String]) = {
         val baseUrl = new URL(cssUrl).toURI
-        // val parentPath = baseUrl.getPath.split('/').filter(_.nonEmpty).dropRight(1)
 
         def cssResource(_url: String): WebResource = {
-          /* @tailrec
-          def normalizePath(pageNodes: Seq[String], urlNodes: Seq[String]): Seq[String] = urlNodes match {
-            case Nil ⇒
-              pageNodes
-
-            case ".." +: rest ⇒
-              normalizePath(pageNodes.dropRight(1), rest)
-
-            case "." +: rest ⇒
-              normalizePath(pageNodes, rest)
-
-            case path +: rest ⇒
-              normalizePath(pageNodes :+ path, rest)
-          } */
-
-          val fullUrl = if (_url.contains("://")) _url else baseUrl.resolve(_url).toString
+          val fullUrl = if (WebZincUtils.isAbsoluteURL(_url)) _url else baseUrl.resolve(_url).toString
 
           new WebResource {
             def url: String = _url
@@ -80,10 +65,15 @@ private[fetcher] class HtmlUnitWebResourceFetcher(implicit ec: ExecutionContext)
         val audios = page.elementsByTagName[HtmlAudio]("audio").flatMap { audio ⇒
           audio.getAttribute("src") :: audio.subElementsByTagName[HtmlSource]("source").map(_.getAttribute("src")).toList
         }
+
         val scripts = page.elementsByTagName[HtmlScript]("script").map(_.getSrcAttribute)
         val linked = page.elementsByTagName[HtmlLink]("link").map(_.getHrefAttribute)
         val anchored = page.anchors.map(_.getHrefAttribute).filter(needToSave)
-        (images ++ videos ++ audios ++ scripts ++ linked ++ anchored).filter(_.nonEmpty).toVector.distinct
+
+        (images ++ videos ++ audios ++ scripts ++ linked ++ anchored)
+          .filter(url ⇒ url.nonEmpty && !WebZincUtils.isHashURL(url))
+          .toVector
+          .distinct
       }
 
       val stylesheetResources = {
@@ -99,8 +89,8 @@ private[fetcher] class HtmlUnitWebResourceFetcher(implicit ec: ExecutionContext)
         Source(linkedStyles)
           .flatMapConcat(url ⇒ toByteStream(url).fold(ByteString.empty)(_ ++ _).map(bs ⇒ (url, bs.utf8String)))
           .withAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider) and blockingAttributes)
-          .map { case (cssUrl, style) ⇒ cssResources(cssUrl, extractStylesheetResources(style)) }
-          .concat(Source(staticStyles).map(extractStylesheetResources).map(cssResources(page.getUrl.toString, _)))
+          .map { case (cssUrl, style) ⇒ cssResources(cssUrl, WebZincUtils.extractCSSResources(style)) }
+          .concat(Source(staticStyles).map(WebZincUtils.extractCSSResources).map(cssResources(page.getUrl.toString, _)))
           .mapConcat(_.toVector)
           .named("stylesheetResources")
       }
@@ -127,11 +117,6 @@ private[fetcher] class HtmlUnitWebResourceFetcher(implicit ec: ExecutionContext)
       StreamConverters.fromInputStream(() ⇒ page.getWebResponse.getContentAsStream)
         .alsoTo(Sink.onComplete(_ ⇒ page.cleanUp()))
     }
-  }
-
-  protected def extractStylesheetResources(style: String) = {
-    val regex = """url\([\"']([^\"']+)[\"']\)""".r
-    regex.findAllMatchIn(style).map(m ⇒ m.group(1)).toVector.distinct
   }
 
   protected def needToSave(url: String) = {
