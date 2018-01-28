@@ -7,7 +7,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import akka.NotUsed
 import akka.dispatch.MessageDispatcher
 import akka.stream.{ActorAttributes, Attributes, Supervision}
-import akka.stream.scaladsl.{Source, StreamConverters}
+import akka.stream.scaladsl.{Sink, Source, StreamConverters}
 import akka.util.ByteString
 import com.gargoylesoftware.htmlunit.Page
 import com.gargoylesoftware.htmlunit.html._
@@ -19,34 +19,6 @@ import com.karasiq.webzinc.model.{WebPage, WebResource}
 private[fetcher] class HtmlUnitWebResourceFetcher(implicit ec: ExecutionContext) extends WebResourceFetcher {
   import HtmlUnitUtils._
   protected val webClient = newWebClient(js = false)
-
-  protected def toByteStream(fullUrl: String) = {
-    webClient.withGetPage(fullUrl) { p: Page ⇒
-      StreamConverters.fromInputStream(() ⇒ p.getWebResponse.getContentAsStream)
-    }
-  }
-
-  protected def extractStylesheetResources(style: String) = {
-    val regex = """url\([\"']([^\"']+)[\"']\)""".r
-    regex.findAllMatchIn(style).map(m ⇒ m.group(1)).toVector.distinct
-  }
-
-  protected def needToSave(url: String) = {
-    val extensionsToSave = Set("jpg", "jpeg", "png", "tif", "tiff", "svg", "pdf", "doc", "rtf", "webm", "mp4", "mp3", "ogg", "ogv", "flac")
-    val extension = {
-      val dotIndex = url.lastIndexOf('.')
-      if (dotIndex == -1) "" else url.substring(dotIndex + 1)
-    }
-    extensionsToSave.contains(extension)
-  }
-
-  protected val blockingAttributes = ec match {
-    case md: MessageDispatcher ⇒
-      ActorAttributes.dispatcher(md.id)
-
-    case _ ⇒
-      Attributes(ActorAttributes.IODispatcher)
-  }
 
   def getWebPage(url: String) = Future {
     webClient.withGetHtmlPage(url) { page ⇒
@@ -139,5 +111,35 @@ private[fetcher] class HtmlUnitWebResourceFetcher(implicit ec: ExecutionContext)
 
       (pageResource, resources)
     }
+  }
+
+  protected def blockingAttributes = ec match {
+    case md: MessageDispatcher ⇒
+      ActorAttributes.dispatcher(md.id)
+
+    case _ ⇒
+      Attributes(ActorAttributes.IODispatcher)
+  }
+
+  protected def toByteStream(fullUrl: String) = {
+    Source.single(fullUrl).flatMapConcat { url ⇒
+      val page = webClient.getPage[Page](url)
+      StreamConverters.fromInputStream(() ⇒ page.getWebResponse.getContentAsStream)
+        .alsoTo(Sink.onComplete(_ ⇒ page.cleanUp()))
+    }
+  }
+
+  protected def extractStylesheetResources(style: String) = {
+    val regex = """url\([\"']([^\"']+)[\"']\)""".r
+    regex.findAllMatchIn(style).map(m ⇒ m.group(1)).toVector.distinct
+  }
+
+  protected def needToSave(url: String) = {
+    val extensionsToSave = Set("jpg", "jpeg", "png", "tif", "tiff", "svg", "pdf", "doc", "rtf", "webm", "mp4", "mp3", "ogg", "ogv", "flac")
+    val extension = {
+      val dotIndex = url.lastIndexOf('.')
+      if (dotIndex == -1) "" else url.substring(dotIndex + 1)
+    }
+    extensionsToSave.contains(extension)
   }
 }
