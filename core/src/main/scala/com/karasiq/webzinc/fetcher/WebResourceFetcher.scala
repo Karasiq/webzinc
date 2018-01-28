@@ -1,7 +1,10 @@
 package com.karasiq.webzinc.fetcher
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
+import akka.stream.Materializer
+
+import com.karasiq.webzinc.client.WebClient
 import com.karasiq.webzinc.model.{WebPage, WebResources}
 
 trait WebResourceFetcher {
@@ -9,7 +12,7 @@ trait WebResourceFetcher {
 }
 
 object WebResourceFetcher {
-  def apply()(implicit ec: ExecutionContext): WebResourceFetcher = {
-    new HtmlUnitWebResourceFetcher()
+  def apply()(implicit webClient: WebClient, mat: Materializer): WebResourceFetcher = {
+    JsoupWebResourceFetcher()
   }
 }

@@ -8,7 +8,13 @@ import org.jsoup.Jsoup
 
 import com.karasiq.webzinc.model.{WebPage, WebResources}
 
-private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends WebResourceInliner {
+object JSWebResourceInliner {
+  def apply()(implicit mat: Materializer): JSWebResourceInliner = {
+    new JSWebResourceInliner
+  }
+}
+
+class JSWebResourceInliner(implicit mat: Materializer) extends WebResourceInliner {
   protected def header(page: WebPage) =
     s"""var webzinc_origin = new URL('${page.url}');
        |var webzinc_resources = {};
@@ -156,7 +162,8 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
           .map((resource.url, _))
           .log("fetched-resources", { case (url, data) ⇒ url + " (" + data.length + " bytes)"})
       })
-      .addAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
+      .withAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
+      .named("resourceBytes")
 
     Source.single(header(page))
       .concat(resourceBytes.map { case (url, bytes) ⇒ s"webzinc_resources['$url'] = '${base64(bytes)}';" })

@@ -74,7 +74,9 @@ lazy val core = project
     commonSettings,
     publishSettings,
     name := baseName,
-    libraryDependencies ++= ProjectDeps.akka.all ++ ProjectDeps.commonsNetwork ++ ProjectDeps.htmlUnit ++ ProjectDeps.jsoup ++ ProjectDeps.scalaTest.map(_ % "test")
+    libraryDependencies ++=
+      ProjectDeps.akka.streams ++ ProjectDeps.akka.http ++ ProjectDeps.commonsNetwork ++
+      ProjectDeps.htmlUnit ++ ProjectDeps.jsoup ++ ProjectDeps.scalaTest.map(_ % "test")
   )
 
 lazy val app = project

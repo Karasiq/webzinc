@@ -12,6 +12,6 @@ trait WebResourceInliner {
 
 object WebResourceInliner {
   def apply()(implicit mat: Materializer): WebResourceInliner = {
-    new JSWebResourceInliner()
+    JSWebResourceInliner()
   }
 }

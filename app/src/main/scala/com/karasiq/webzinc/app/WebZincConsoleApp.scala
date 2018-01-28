@@ -4,19 +4,21 @@ import java.nio.file.{Files, Paths}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 
+import com.karasiq.webzinc.client.WebClient
 import com.karasiq.webzinc.fetcher.WebResourceFetcher
 import com.karasiq.webzinc.inliner.WebResourceInliner
 
 object WebZincConsoleApp extends App {
   implicit val actorSystem = ActorSystem()
   implicit val materializer = ActorMaterializer()
+
+  implicit val client = WebClient()
   val fetcher = WebResourceFetcher()
   val inliner = WebResourceInliner()
 
