@@ -1,9 +1,10 @@
-package com.karasiq.webzinc.inliner
+package com.karasiq.webzinc
 
 import scala.concurrent.Future
 
 import akka.stream.Materializer
 
+import com.karasiq.webzinc.impl.jsoup.JsoupJSWebResourceInliner
 import com.karasiq.webzinc.model.{WebPage, WebResources}
 
 trait WebResourceInliner {
@@ -12,6 +13,6 @@ trait WebResourceInliner {
 
 object WebResourceInliner {
   def apply()(implicit mat: Materializer): WebResourceInliner = {
-    JSWebResourceInliner()
+    JsoupJSWebResourceInliner()
   }
 }

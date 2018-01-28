@@ -1,10 +1,10 @@
-package com.karasiq.webzinc.fetcher
+package com.karasiq.webzinc
 
 import scala.concurrent.Future
 
 import akka.stream.Materializer
 
-import com.karasiq.webzinc.client.WebClient
+import com.karasiq.webzinc.impl.jsoup.JsoupWebResourceFetcher
 import com.karasiq.webzinc.model.{WebPage, WebResources}
 
 trait WebResourceFetcher {

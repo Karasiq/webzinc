@@ -1,4 +1,4 @@
-package com.karasiq.webzinc.client
+package com.karasiq.webzinc.impl.htmlunit
 
 import akka.NotUsed
 import akka.stream.scaladsl.{Sink, Source, StreamConverters}
@@ -6,6 +6,7 @@ import akka.util.ByteString
 import com.gargoylesoftware.htmlunit.Page
 
 import com.karasiq.networkutils.HtmlUnitUtils.newWebClient
+import com.karasiq.webzinc.WebClient
 import com.karasiq.webzinc.utils.StreamAttrs
 
 object HtmlUnitWebClient {

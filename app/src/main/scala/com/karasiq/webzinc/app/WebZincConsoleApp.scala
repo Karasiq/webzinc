@@ -10,9 +10,8 @@ import scala.language.postfixOps
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 
-import com.karasiq.webzinc.client.WebClient
-import com.karasiq.webzinc.fetcher.WebResourceFetcher
-import com.karasiq.webzinc.inliner.WebResourceInliner
+import com.karasiq.webzinc.{WebClient, WebResourceFetcher, WebResourceInliner}
+import com.karasiq.webzinc.utils.WebZincUtils
 
 object WebZincConsoleApp extends App {
   implicit val actorSystem = ActorSystem()
@@ -28,13 +27,8 @@ object WebZincConsoleApp extends App {
       val (page, resources) = Await.result(fetcher.getWebPage(url), Duration.Inf)
       val processedPage = Await.result(inliner.inline(page, resources), Duration.Inf)
 
-      def validFileName(str: String) = {
-        val forbiddenChars = """[<>:"/\\|?*]""".r
-        forbiddenChars.replaceAllIn(str, "_")
-      }
-
       // Files.write(Paths.get(s"${validFileName(page.title)} [${Integer.toHexString(page.url.hashCode)}]_orig.html"), Seq(page.html).asJava)
-      Files.write(Paths.get(s"${validFileName(page.title)} [${Integer.toHexString(page.url.hashCode)}].html"), Seq(processedPage.html).asJava)
+      Files.write(Paths.get(WebZincUtils.getValidFileName(processedPage)), Seq(processedPage.html).asJava)
     }
   } finally actorSystem.terminate()
 }

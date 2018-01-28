@@ -1,4 +1,4 @@
-package com.karasiq.webzinc.fetcher
+package com.karasiq.webzinc.impl.htmlunit
 
 import java.net.URL
 import java.util.Collections
@@ -14,7 +14,7 @@ import com.gargoylesoftware.htmlunit.html._
 import com.gargoylesoftware.htmlunit.util.NameValuePair
 
 import com.karasiq.networkutils.HtmlUnitUtils
-import com.karasiq.webzinc.client.WebClient
+import com.karasiq.webzinc.{WebClient, WebResourceFetcher}
 import com.karasiq.webzinc.model.{WebPage, WebResource}
 import com.karasiq.webzinc.utils.{CSSUtils, URLUtils}
 

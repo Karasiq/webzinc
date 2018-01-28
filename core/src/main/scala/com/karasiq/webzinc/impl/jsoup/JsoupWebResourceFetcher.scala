@@ -1,4 +1,4 @@
-package com.karasiq.webzinc.fetcher
+package com.karasiq.webzinc.impl.jsoup
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -11,7 +11,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.select.Elements
 
-import com.karasiq.webzinc.client.WebClient
+import com.karasiq.webzinc.{WebClient, WebResourceFetcher}
 import com.karasiq.webzinc.model.{WebPage, WebResource, WebResources}
 import com.karasiq.webzinc.utils.{CSSUtils, URLUtils}
 

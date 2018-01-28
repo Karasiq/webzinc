@@ -1,26 +1,23 @@
-package com.karasiq.webzinc.inliner
+package com.karasiq.webzinc.utils
+
 import java.util.Base64
 
-import akka.stream.{ActorAttributes, Materializer, Supervision}
-import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
-import org.jsoup.Jsoup
 
-import com.karasiq.webzinc.model.{WebPage, WebResources}
+import com.karasiq.webzinc.model.WebPage
 
-object JSWebResourceInliner {
-  def apply()(implicit mat: Materializer): JSWebResourceInliner = {
-    new JSWebResourceInliner
-  }
-}
-
-class JSWebResourceInliner(implicit mat: Materializer) extends WebResourceInliner {
-  protected def header(page: WebPage) =
+private[webzinc] object JSInlinerScript {
+  def header(page: WebPage) =
     s"""var webzinc_origin = new URL('${page.url}');
        |var webzinc_resources = {};
        |""".stripMargin
 
-  protected def initScript =
+  def resource(url: String, bytes: ByteString) = {
+    @inline def base64(data: ByteString) = Base64.getEncoder.encodeToString(data.toArray)
+    s"webzinc_resources['$url'] = '${base64(bytes)}';"
+  }
+
+  def initScript =
     """
       |document.addEventListener("DOMContentLoaded", function () {
       |    function getResourceData(url) {
@@ -132,44 +129,4 @@ class JSWebResourceInliner(implicit mat: Materializer) extends WebResourceInline
       |    foreach(document.getElementsByTagName('style'), processStyle);
       |});
     """.stripMargin
-
-  protected def insertScript(html: String, script: String): String = {
-    val parsedPage = Jsoup.parse(html)
-    val scripts = parsedPage.head().getElementsByTag("script")
-    if (scripts.isEmpty) {
-      parsedPage.head().append("<script>" + script + "</script>")
-    } else {
-      scripts.first().before("<script>" + script + "</script>")
-    }
-
-    // Fix charset
-    Option(parsedPage.head().selectFirst("meta[charset]"))
-      .getOrElse(parsedPage.head().prependElement("meta"))
-      .attr("charset", "utf-8")
-
-    parsedPage.outerHtml()
-  }
-
-  def inline(page: WebPage, resources: WebResources) = {
-    @inline
-    def base64(data: ByteString) = Base64.getEncoder.encodeToString(data.toArray)
-
-    val resourceBytes = resources
-      .filter(r ⇒ !Set("", "/", page.url).contains(r.url))
-      .flatMapMerge(3, { resource ⇒
-        resource.dataStream
-          .fold(ByteString.empty)(_ ++ _)
-          .map((resource.url, _))
-          .log("fetched-resources", { case (url, data) ⇒ url + " (" + data.length + " bytes)"})
-      })
-      .withAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
-      .named("resourceBytes")
-
-    Source.single(header(page))
-      .concat(resourceBytes.map { case (url, bytes) ⇒ s"webzinc_resources['$url'] = '${base64(bytes)}';" })
-      .concat(Source.single(initScript))
-      .fold("")(_ + "\n" + _)
-      .map(script ⇒ page.copy(html = insertScript(page.html, script)))
-      .runWith(Sink.head)
-  }
 }
