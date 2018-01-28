@@ -4,7 +4,7 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.12.3",
   crossScalaVersions += "2.11.11",
   organization := "com.github.karasiq",
-  version := "1.0.2",
+  version := "1.0.3",
   isSnapshot := version.value.endsWith("-SNAPSHOT")
 )
 

@@ -44,9 +44,13 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |    }
       |
       |    function toAbsoluteURL(url) {
-      |       if (url.indexOf('://') != -1 || url.startsWith('javascript:')) return url;
-      |       else if (url.startsWith('/')) return webzinc_origin.origin + url;
-      |       else return webzinc_origin.origin + '/' + url;
+      |        if (isAbsoluteURL(url)) return url;
+      |        else if (url.startsWith('/')) return webzinc_origin.origin + url;
+      |        else return webzinc_origin.origin + '/' + url;
+      |    }
+      |
+      |    function isAbsoluteURL(url) {
+      |        return url.indexOf('://') != -1 || url.startsWith('//') || url.startsWith('javascript:');
       |    }
       |
       |    function getContentType(url) {
@@ -55,6 +59,7 @@ private[inliner] class JSWebResourceInliner(implicit mat: Materializer) extends 
       |            jpg: 'image/jpeg',
       |            jpeg: 'image/jpeg',
       |            gif: 'image/gif',
+      |            ico: 'image/x-icon',
       |            svg: 'image/svg+xml',
       |            pdf: 'application/pdf',
       |            js: 'text/javascript',
