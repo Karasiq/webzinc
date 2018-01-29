@@ -1,13 +1,15 @@
 package com.karasiq.webzinc.impl.htmlunit
 
 import java.net.URL
-import java.util.Collections
 
+import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 import akka.NotUsed
-import akka.stream.{ActorAttributes, Attributes, Materializer, Supervision}
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.{ActorAttributes, Materializer, Supervision}
+import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.gargoylesoftware.htmlunit.{HttpMethod, Page, WebResponse, WebResponseData}
 import com.gargoylesoftware.htmlunit.html._
@@ -34,12 +36,14 @@ class HtmlUnitWebResourceFetcher(js: Boolean)(implicit client: WebClient, mat: M
     (pageResource, resources)
   }
 
-  protected def getPage(url: String): Future[Page] = {
-    client.openDataStream(url).runWith(Sink.fold(ByteString.empty)(_ ++ _)).map { pageBytes ⇒
-      val pc = webClient.getPageCreator
-      val responseData = new WebResponseData(pageBytes.toArray, 200, "OK", Collections.emptyList[NameValuePair]())
-      pc.createPage(new WebResponse(responseData, new URL(url), HttpMethod.GET, 1L), webClient.getCurrentWindow)
-    }
+  protected def getPage(url: String): Future[Page] = for {
+    response ← client.doHttpRequest(url)
+    entity ← response.entity.toStrict(10 seconds)
+  } yield {
+    val pageCreator = webClient.getPageCreator
+    val headers = response.headers.map(h ⇒ new NameValuePair(h.name(), h.value())).asJava
+    val responseData = new WebResponseData(entity.data.toArray, response.status.intValue(), response.status.reason(), headers)
+    pageCreator.createPage(new WebResponse(responseData, new URL(url), HttpMethod.GET, 1L), webClient.getCurrentWindow)
   }
 
   protected def embeddedResources(page: HtmlPage) = {
@@ -47,11 +51,7 @@ class HtmlUnitWebResourceFetcher(js: Boolean)(implicit client: WebClient, mat: M
       val fullUrl = page.getFullyQualifiedUrl(_url).toString
       new WebResource {
         def url: String = _url
-        def dataStream: Source[ByteString, NotUsed] = {
-          Source.single(fullUrl)
-            .flatMapConcat(client.openDataStream)
-            .withAttributes(Attributes.name("pageResource"))
-        }
+        def dataStream: Source[ByteString, NotUsed] = client.openDataStream(fullUrl)
       }
     }
 
@@ -85,11 +85,7 @@ class HtmlUnitWebResourceFetcher(js: Boolean)(implicit client: WebClient, mat: M
 
         new WebResource {
           def url: String = _url
-          def dataStream: Source[ByteString, NotUsed] = {
-            Source.single(fullUrl)
-              .flatMapConcat(client.openDataStream)
-              .named("cssResource")
-          }
+          def dataStream: Source[ByteString, NotUsed] = client.openDataStream(fullUrl)
         }
       }
 

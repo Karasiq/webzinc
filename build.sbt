@@ -75,7 +75,7 @@ lazy val core = project
     publishSettings,
     name := baseName,
     libraryDependencies ++=
-      ProjectDeps.akka.streams ++ ProjectDeps.akka.http ++ ProjectDeps.commonsNetwork ++
+      ProjectDeps.akka.streams ++ ProjectDeps.akka.http ++
       ProjectDeps.jsoup ++ ProjectDeps.scalaTest.map(_ % "test")
   )
 
@@ -84,7 +84,7 @@ lazy val htmlunit = project
     commonSettings,
     publishSettings,
     name := s"$baseName-htmlunit",
-    libraryDependencies ++= ProjectDeps.htmlUnit
+    libraryDependencies ++= ProjectDeps.htmlUnit ++ ProjectDeps.commonsNetwork
   )
   .dependsOn(core)
 
@@ -97,6 +97,6 @@ lazy val app = project
   .dependsOn(core)
   .enablePlugins(JavaAppPackaging, WindowsPlugin /*, ClasspathJarPlugin, JDKPackagerPlugin*/)
   
-lazy val `webzinc` = (project in file("."))
+lazy val webzinc = (project in file("."))
   .settings(commonSettings, noPublishSettings, name := s"$baseName-root")
   .aggregate(app)
