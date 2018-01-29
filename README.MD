@@ -1,5 +1,5 @@
 # WebZinc
-WebZinc - web page archival utility. Bundles all resources in a single html file.
+Web page archival utility. Bundles all resources in a single html file.
 
 # Usage
 ```
