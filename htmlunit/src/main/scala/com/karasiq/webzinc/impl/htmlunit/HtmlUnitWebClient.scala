@@ -5,7 +5,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.HttpHeader.ParsingResult
-import akka.stream.scaladsl.{Sink, StreamConverters}
+import akka.stream.scaladsl.StreamConverters
 import com.gargoylesoftware.htmlunit.Page
 
 import com.karasiq.networkutils.HtmlUnitUtils.newWebClient
@@ -32,7 +32,7 @@ class HtmlUnitWebClient(implicit ec: ExecutionContext) extends WebClient {
 
     val contentType = ContentType.parse(page.getWebResponse.getContentType).right.getOrElse(ContentTypes.`application/octet-stream`)
     val dataStream = StreamConverters.fromInputStream(() ⇒ page.getWebResponse.getContentAsStream)
-      .alsoTo(Sink.onComplete(_ ⇒ page.cleanUp()))
+      // .alsoTo(Sink.onComplete(_ ⇒ page.cleanUp()))
       .withAttributes(StreamAttrs.useProvidedOrBlockingDispatcher)
       .named("htmlUnitDataStream")
     val entity = HttpEntity(contentType, page.getWebResponse.getContentLength, dataStream)

@@ -40,9 +40,10 @@ class JsoupJSWebResourceInliner(implicit mat: Materializer) extends WebResourceI
         resource.dataStream
           .fold(ByteString.empty)(_ ++ _)
           .map((resource.url, _))
-          .log("fetched-resources", { case (url, data) ⇒ url + " (" + data.length + " bytes)"})
+          .recoverWithRetries(1, { case _ ⇒ Source.empty })
       })
       .withAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
+      .log("fetched-resources", { case (url, data) ⇒ url + " (" + data.length + " bytes)"})
       .named("resourceBytes")
 
     Source.single(JSInlinerScript.header(page))

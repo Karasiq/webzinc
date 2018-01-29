@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.MediaTypes
 import akka.http.scaladsl.model.headers.`Content-Type`
 import akka.stream.scaladsl.Sink
 
-import com.karasiq.webzinc.{WebClient, WebResourceFetcher}
+import com.karasiq.webzinc.{WebClient, WebResourceFetcher, WebResourceInliner}
 
 abstract class WebZincSpec extends StandardSpec {
   def testWebClient(wc: WebClient): Unit = {
@@ -33,6 +33,15 @@ abstract class WebZincSpec extends StandardSpec {
       val resources = resourcesStream.runWith(Sink.seq).futureValue.map(_.url)
       resources should contain ("https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js")
       resources should contain ("../fonts/fontawesome-webfont.woff?v=4.7.0")
+    }
+  }
+
+  def testResourceInliner(rf: WebResourceFetcher, il: WebResourceInliner): Unit = {
+    "WebResourceInliner" should "inline resources" in {
+      val page = rf.getWebPage("https://en.wikipedia.org/wiki/1856").flatMap(il.inline _ tupled).futureValue
+      page.url shouldBe "https://en.wikipedia.org/wiki/1856"
+      page.title shouldBe "1856 - Wikipedia"
+      page.html.length should be >= 1000000
     }
   }
 }
