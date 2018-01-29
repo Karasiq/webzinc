@@ -75,8 +75,8 @@ lazy val core = project
     publishSettings,
     name := baseName,
     libraryDependencies ++=
-      ProjectDeps.akka.streams ++ ProjectDeps.akka.http ++
-      ProjectDeps.jsoup ++ ProjectDeps.scalaTest.map(_ % "test")
+      ProjectDeps.akka.streams ++ ProjectDeps.akka.http ++ ProjectDeps.jsoup ++
+      (ProjectDeps.scalaTest ++ ProjectDeps.akka.testKit).map(_ % "test")
   )
 
 lazy val htmlunit = project
@@ -86,7 +86,7 @@ lazy val htmlunit = project
     name := s"$baseName-htmlunit",
     libraryDependencies ++= ProjectDeps.htmlUnit ++ ProjectDeps.commonsNetwork
   )
-  .dependsOn(core)
+  .dependsOn(core % "compile->compile;test->test")
 
 lazy val libs = (project in file("target") / "libs")
   .settings(commonSettings, noPublishSettings, name := s"$baseName-libs")

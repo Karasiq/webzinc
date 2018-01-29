@@ -41,7 +41,9 @@ class HtmlUnitWebResourceFetcher(js: Boolean)(implicit client: WebClient, mat: M
     entity ← response.entity.toStrict(10 seconds)
   } yield {
     val pageCreator = webClient.getPageCreator
-    val headers = response.headers.map(h ⇒ new NameValuePair(h.name(), h.value())).asJava
+    val headers = response.headers.map(h ⇒ new NameValuePair(h.name(), h.value()))
+      .filterNot(p ⇒ p.getName == "Content-Encoding" || p.getName == "Content-Length")
+      .asJava
     val responseData = new WebResponseData(entity.data.toArray, response.status.intValue(), response.status.reason(), headers)
     pageCreator.createPage(new WebResponse(responseData, new URL(url), HttpMethod.GET, 1L), webClient.getCurrentWindow)
   }
