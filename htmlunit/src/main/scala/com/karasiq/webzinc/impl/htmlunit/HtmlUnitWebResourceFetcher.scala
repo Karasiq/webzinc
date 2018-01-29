@@ -9,7 +9,7 @@ import scala.language.postfixOps
 
 import akka.NotUsed
 import akka.stream.{ActorAttributes, Materializer, Supervision}
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Sink, Source, StreamConverters}
 import akka.util.ByteString
 import com.gargoylesoftware.htmlunit.{HttpMethod, Page, WebResponse, WebResponseData}
 import com.gargoylesoftware.htmlunit.html._
@@ -21,31 +21,37 @@ import com.karasiq.webzinc.model.{WebPage, WebResource}
 import com.karasiq.webzinc.utils.{CSSUtils, URLUtils}
 
 object HtmlUnitWebResourceFetcher {
-  def apply(js: Boolean = false)(implicit client: WebClient, mat: Materializer, ec: ExecutionContext): HtmlUnitWebResourceFetcher = {
-    new HtmlUnitWebResourceFetcher(js)
+  def apply(js: Boolean = false, externalClient: Option[WebClient] = None)(implicit ec: ExecutionContext, mat: Materializer): HtmlUnitWebResourceFetcher = {
+    new HtmlUnitWebResourceFetcher(js, externalClient)
   }
 }
 
-class HtmlUnitWebResourceFetcher(js: Boolean)(implicit client: WebClient, mat: Materializer, ec: ExecutionContext) extends WebResourceFetcher {
+class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])(implicit ec: ExecutionContext, mat: Materializer) extends WebResourceFetcher {
   import HtmlUnitUtils._
   protected val webClient = newWebClient(js)
 
-  def getWebPage(url: String) = getPage(url).collect { case page: HtmlPage ⇒
-    val pageResource = WebPage(url, page.getTitleText, page.getWebResponse.getContentAsString())
-    val resources = embeddedResources(page).concat(cssResources(page))
+  def getWebPage(url: String) = getPage(url).collect { case htmlPage: HtmlPage ⇒
+    val pageResource = WebPage(url, htmlPage.getTitleText, htmlPage.getWebResponse.getContentAsString())
+    val resources = embeddedResources(htmlPage).concat(cssResources(htmlPage))
     (pageResource, resources)
   }
 
-  protected def getPage(url: String): Future[Page] = for {
-    response ← client.doHttpRequest(url)
-    entity ← response.entity.toStrict(10 seconds)
-  } yield {
-    val pageCreator = webClient.getPageCreator
-    val headers = response.headers.map(h ⇒ new NameValuePair(h.name(), h.value()))
-      .filterNot(p ⇒ p.getName == "Content-Encoding" || p.getName == "Content-Length")
-      .asJava
-    val responseData = new WebResponseData(entity.data.toArray, response.status.intValue(), response.status.reason(), headers)
-    pageCreator.createPage(new WebResponse(responseData, new URL(url), HttpMethod.GET, 1L), webClient.getCurrentWindow)
+  protected def getPage(url: String): Future[Page] = externalClient match {
+    case Some(client) ⇒
+      for {
+        response ← client.doHttpRequest(url)
+        entity ← response.entity.toStrict(10 seconds)
+      } yield {
+        val pageCreator = webClient.getPageCreator
+        val headers = response.headers.map(h ⇒ new NameValuePair(h.name(), h.value()))
+          .filterNot(p ⇒ p.getName == "Content-Encoding" || p.getName == "Content-Length")
+          .asJava
+        val responseData = new WebResponseData(entity.data.toArray, response.status.intValue(), response.status.reason(), headers)
+        pageCreator.createPage(new WebResponse(responseData, new URL(url), HttpMethod.GET, 100L), webClient.getCurrentWindow)
+      }
+
+    case None ⇒
+      Future(webClient.getPage[Page](url))
   }
 
   protected def embeddedResources(page: HtmlPage) = {
@@ -53,7 +59,7 @@ class HtmlUnitWebResourceFetcher(js: Boolean)(implicit client: WebClient, mat: M
       val fullUrl = page.getFullyQualifiedUrl(_url).toString
       new WebResource {
         def url: String = _url
-        def dataStream: Source[ByteString, NotUsed] = client.openDataStream(fullUrl)
+        def dataStream: Source[ByteString, NotUsed] = getByteStream(fullUrl)
       }
     }
 
@@ -87,7 +93,7 @@ class HtmlUnitWebResourceFetcher(js: Boolean)(implicit client: WebClient, mat: M
 
         new WebResource {
           def url: String = _url
-          def dataStream: Source[ByteString, NotUsed] = client.openDataStream(fullUrl)
+          def dataStream: Source[ByteString, NotUsed] = getByteStream(fullUrl)
         }
       }
 
@@ -104,12 +110,24 @@ class HtmlUnitWebResourceFetcher(js: Boolean)(implicit client: WebClient, mat: M
       .toVector
 
     Source(linkedStyles)
-      .flatMapConcat(url ⇒ client.openDataStream(url).fold(ByteString.empty)(_ ++ _).map(bs ⇒ (url, bs.utf8String)))
+      .flatMapConcat(url ⇒ getByteStream(url).fold(ByteString.empty)(_ ++ _).map(bs ⇒ (url, bs.utf8String)))
       .withAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
       .map { case (cssUrl, style) ⇒ toResources(cssUrl, CSSUtils.extractCSSResources(style)) }
       .concat(Source(staticStyles).map(CSSUtils.extractCSSResources).map(toResources(page.getUrl.toString, _)))
       .mapConcat(_.toVector)
       .log("css-resources")
       .named("cssResources")
+  }
+
+  protected def getByteStream(url: String) = externalClient match {
+    case Some(client) ⇒
+      client.openDataStream(url)
+
+    case None ⇒
+      Source.single(url).flatMapConcat { url ⇒
+        val page = webClient.getPage[Page](url)
+        StreamConverters.fromInputStream(() ⇒ page.getWebResponse.getContentAsStream)
+          .alsoTo(Sink.onComplete(_ ⇒ page.cleanUp()))
+      }
   }
 }

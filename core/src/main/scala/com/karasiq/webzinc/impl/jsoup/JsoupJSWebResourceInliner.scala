@@ -36,10 +36,13 @@ class JsoupJSWebResourceInliner(implicit mat: Materializer) extends WebResourceI
   def inline(page: WebPage, resources: WebResources) = {
     val resourceBytes = resources
       .filter(r ⇒ !Set("", "/", page.url).contains(r.url))
-      .flatMapMerge(3, { resource ⇒
-        resource.dataStream
+      .flatMapMerge(2, { resource ⇒
+        def stream = resource.dataStream
           .fold(ByteString.empty)(_ ++ _)
           .map((resource.url, _))
+
+        stream
+          .recoverWithRetries(3, { case _ ⇒ stream })
           .recoverWithRetries(1, { case _ ⇒ Source.empty })
       })
       .withAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
