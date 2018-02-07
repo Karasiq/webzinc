@@ -82,7 +82,7 @@ private[webzinc] object JSInlinerScript {
       |
       |        var parts = file.split('.');
       |        var extension = parts[parts.length - 1];
-      |        return types[extension];
+      |        return types[extension] || 'application/octet-stream';
       |    }
       |
       |    function processCssLinks(style) {
