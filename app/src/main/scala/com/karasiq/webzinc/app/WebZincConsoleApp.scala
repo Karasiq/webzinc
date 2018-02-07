@@ -18,6 +18,7 @@ import com.karasiq.webzinc.utils.WebZincUtils
 object WebZincConsoleApp extends App {
   implicit val actorSystem = ActorSystem()
   implicit val materializer = ActorMaterializer()
+  import actorSystem.dispatcher
 
   implicit val config = WebZincConfig()
   val fetcher = HtmlUnitWebResourceFetcher()
