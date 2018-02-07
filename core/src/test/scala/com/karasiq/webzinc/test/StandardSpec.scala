@@ -17,8 +17,8 @@ abstract class StandardSpec extends TestKit(ActorSystem("test")) with ImplicitSe
   implicit val materializer = ActorMaterializer()
   implicit val executionContext = system.dispatcher
 
-  override implicit def patienceConfig: PatienceConfig = {
-    PatienceConfig(5 seconds, 50 millis)
+  override implicit val patienceConfig: PatienceConfig = {
+    PatienceConfig(30 seconds, 300 millis)
   }
 
   override protected def afterAll(): Unit = {

@@ -16,9 +16,9 @@ object AkkaWebClient {
 }
 
 final class AkkaWebClient(implicit as: ActorSystem, mat: Materializer) extends WebClient {
-  private[this] val httpExt = Http()
+  private[this] val http = Http()
 
   def doHttpRequest(url: String): Future[HttpResponse] = {
-    httpExt.singleRequest(HttpRequest(uri = url))
+    http.singleRequest(HttpRequest(uri = url))
   }
 }

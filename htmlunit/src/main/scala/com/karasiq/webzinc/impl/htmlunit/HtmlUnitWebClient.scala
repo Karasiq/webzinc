@@ -31,11 +31,12 @@ class HtmlUnitWebClient(implicit ec: ExecutionContext) extends WebClient {
       .toVector
 
     val contentType = ContentType.parse(page.getWebResponse.getContentType).right.getOrElse(ContentTypes.`application/octet-stream`)
-    val dataStream = StreamConverters.fromInputStream(() ⇒ page.getWebResponse.getContentAsStream)
+    val entityStream = StreamConverters.fromInputStream(() ⇒ page.getWebResponse.getContentAsStream)
       // .alsoTo(Sink.onComplete(_ ⇒ page.cleanUp()))
       .withAttributes(StreamAttrs.useProvidedOrBlockingDispatcher)
-      .named("htmlUnitDataStream")
-    val entity = HttpEntity(contentType, page.getWebResponse.getContentLength, dataStream)
+      .named("htmlunitHttpEntity")
+
+    val entity = HttpEntity(contentType, page.getWebResponse.getContentLength, entityStream)
 
     HttpResponse(statusCode, headers, entity)
   }

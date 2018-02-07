@@ -4,7 +4,6 @@ import java.net.URL
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 import akka.NotUsed
@@ -17,16 +16,17 @@ import com.gargoylesoftware.htmlunit.util.NameValuePair
 
 import com.karasiq.networkutils.HtmlUnitUtils
 import com.karasiq.webzinc.{WebClient, WebResourceFetcher}
+import com.karasiq.webzinc.config.WebZincConfig
 import com.karasiq.webzinc.model.{WebPage, WebResource}
-import com.karasiq.webzinc.utils.{CSSUtils, URLUtils}
+import com.karasiq.webzinc.utils.{CSSUtils, StreamAttrs, StreamUtils, URLUtils}
 
 object HtmlUnitWebResourceFetcher {
-  def apply(js: Boolean = false, externalClient: Option[WebClient] = None)(implicit ec: ExecutionContext, mat: Materializer): HtmlUnitWebResourceFetcher = {
+  def apply(js: Boolean = false, externalClient: Option[WebClient] = None)(implicit config: WebZincConfig, ec: ExecutionContext, mat: Materializer): HtmlUnitWebResourceFetcher = {
     new HtmlUnitWebResourceFetcher(js, externalClient)
   }
 }
 
-class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])(implicit ec: ExecutionContext, mat: Materializer) extends WebResourceFetcher {
+class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])(implicit config: WebZincConfig, ec: ExecutionContext, mat: Materializer) extends WebResourceFetcher {
   import HtmlUnitUtils._
   protected val webClient = newWebClient(js)
 
@@ -40,7 +40,7 @@ class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])
     case Some(client) ⇒
       for {
         response ← client.doHttpRequest(url)
-        entity ← response.entity.toStrict(10 seconds)
+        entity ← response.entity.toStrict(config.readTimeout)
       } yield {
         val pageCreator = webClient.getPageCreator
         val headers = response.headers.map(h ⇒ new NameValuePair(h.name(), h.value()))
@@ -73,7 +73,7 @@ class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])
 
     val scripts = page.elementsByTagName[HtmlScript]("script").map(_.getSrcAttribute)
     val linked = page.elementsByTagName[HtmlLink]("link").map(_.getHrefAttribute)
-    val anchored = page.anchors.map(_.getHrefAttribute).filter(URLUtils.isStdMediaResource)
+    val anchored = page.anchors.map(_.getHrefAttribute).filter(isSaveableResource)
 
     val urls = (images ++ videos ++ audios ++ scripts ++ linked ++ anchored)
       .filter(url ⇒ url.nonEmpty && !URLUtils.isHashURL(url))
@@ -81,7 +81,7 @@ class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])
 
     Source(urls.distinct.map(toResource))
       .log("embedded-resources")
-      .named("embeddedResources")
+      .named("htmlunitEmbeddedResources")
   }
 
   protected def cssResources(page: HtmlPage) = {
@@ -116,18 +116,29 @@ class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])
       .concat(Source(staticStyles).map(CSSUtils.extractCSSResources).map(toResources(page.getUrl.toString, _)))
       .mapConcat(_.toVector)
       .log("css-resources")
-      .named("cssResources")
+      .named("htmlunitCssResources")
   }
 
-  protected def getByteStream(url: String) = externalClient match {
-    case Some(client) ⇒
-      client.openDataStream(url)
+  protected def isSaveableResource(url: String) = {
+    URLUtils.hasExtension(url, config.saveExtensions)
+  }
 
-    case None ⇒
-      Source.single(url).flatMapConcat { url ⇒
-        val page = webClient.getPage[Page](url)
-        StreamConverters.fromInputStream(() ⇒ page.getWebResponse.getContentAsStream)
-          .alsoTo(Sink.onComplete(_ ⇒ page.cleanUp()))
-      }
+  protected def getByteStream(url: String) = {
+    val stream = externalClient match {
+      case Some(client) ⇒
+        client.openDataStream(url)
+
+      case None ⇒
+        Source.single(url).flatMapConcat { url ⇒
+          val page = webClient.getPage[Page](url)
+          StreamConverters.fromInputStream(() ⇒ page.getWebResponse.getContentAsStream)
+            .alsoTo(Sink.onComplete(_ ⇒ page.cleanUp()))
+            .withAttributes(StreamAttrs.useProvidedOrBlockingDispatcher)
+        }
+    }
+
+    stream
+      .via(StreamUtils.applyConfig)
+      .named("htmlunitByteStream")
   }
 }

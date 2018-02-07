@@ -8,8 +8,11 @@ import akka.http.scaladsl.model.headers.`Content-Type`
 import akka.stream.scaladsl.Sink
 
 import com.karasiq.webzinc.{WebClient, WebResourceFetcher, WebResourceInliner}
+import com.karasiq.webzinc.config.WebZincConfig
 
 abstract class WebZincSpec extends StandardSpec {
+  implicit val config = WebZincConfig()
+  
   def testWebClient(wc: WebClient): Unit = {
     "WebClient" should "save page" in {
       val response = wc.doHttpRequest("https://example.com/").futureValue
@@ -25,14 +28,14 @@ abstract class WebZincSpec extends StandardSpec {
 
   def testResourceFetcher(rf: WebResourceFetcher): Unit = {
     "WebResourceFetcher" should "fetch resources" in {
-      val (page, resourcesStream) = rf.getWebPage("http://fontawesome.io/icons/").futureValue
-      page.url shouldBe "http://fontawesome.io/icons/"
-      page.title shouldBe "Font Awesome Icons"
+      val (page, resourcesStream) = rf.getWebPage("https://electronics.stackexchange.com/questions/354665/do-pcbs-have-schematics").futureValue
+      page.url shouldBe "https://electronics.stackexchange.com/questions/354665/do-pcbs-have-schematics"
+      page.title shouldBe "power electronics - Do PCBs have schematics? - Electrical Engineering Stack Exchange"
       page.html.length should be >= 20000
 
       val resources = resourcesStream.runWith(Sink.seq).futureValue.map(_.url)
-      resources should contain ("https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js")
-      resources should contain ("../fonts/fontawesome-webfont.woff?v=4.7.0")
+      resources should contain ("https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js")
+      resources should contain ("img/sprites.svg?v=54431cac5cfa")
     }
   }
 

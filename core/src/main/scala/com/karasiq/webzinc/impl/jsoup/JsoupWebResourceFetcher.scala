@@ -12,18 +12,19 @@ import org.jsoup.nodes.Document
 import org.jsoup.select.Elements
 
 import com.karasiq.webzinc.{WebClient, WebResourceFetcher}
+import com.karasiq.webzinc.config.WebZincConfig
 import com.karasiq.webzinc.model.{WebPage, WebResource, WebResources}
-import com.karasiq.webzinc.utils.{CSSUtils, URLUtils}
+import com.karasiq.webzinc.utils.{CSSUtils, StreamUtils, URLUtils}
 
 object JsoupWebResourceFetcher {
-  def apply()(implicit client: WebClient, mat: Materializer): JsoupWebResourceFetcher = {
+  def apply()(implicit config: WebZincConfig, client: WebClient, mat: Materializer): JsoupWebResourceFetcher = {
     new JsoupWebResourceFetcher
   }
 }
 
-class JsoupWebResourceFetcher(implicit client: WebClient, mat: Materializer) extends WebResourceFetcher {
+class JsoupWebResourceFetcher(implicit config: WebZincConfig, client: WebClient, mat: Materializer) extends WebResourceFetcher {
   def getWebPage(url: String): Future[(WebPage, WebResources)] = {
-    client.openDataStream(url)
+    getByteStream(url)
       .fold(ByteString.empty)(_ ++ _)
       .map { pageBytes ⇒
         val pageHtml = pageBytes.utf8String
@@ -31,6 +32,7 @@ class JsoupWebResourceFetcher(implicit client: WebClient, mat: Materializer) ext
         val resources = embeddedResources(page).concat(cssResources(page))
         (WebPage(url, page.title(), pageHtml), resources)
       }
+      .named("jsoupGetWebPage")
       .runWith(Sink.head)
   }
 
@@ -38,7 +40,7 @@ class JsoupWebResourceFetcher(implicit client: WebClient, mat: Materializer) ext
     def toResource(origin: String, resUrl: String): WebResource = {
       new WebResource {
         val absUrl = URLUtils.resolveUrl(origin, resUrl)
-        def dataStream: Source[ByteString, NotUsed] = client.openDataStream(absUrl)
+        def dataStream: Source[ByteString, NotUsed] = getByteStream(absUrl)
         def url: String = resUrl
       }
     }
@@ -52,7 +54,7 @@ class JsoupWebResourceFetcher(implicit client: WebClient, mat: Materializer) ext
       .map(_.absUrl("href"))
       .filter(_.nonEmpty)
       .map { url ⇒
-        client.openDataStream(url)
+        getByteStream(url)
           .fold(ByteString.empty)(_ ++ _)
           .map(bs ⇒ (url, bs.utf8String))
           .withAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
@@ -65,7 +67,7 @@ class JsoupWebResourceFetcher(implicit client: WebClient, mat: Materializer) ext
         links.map(toResource(origin, _))
       }
       .log("css-resources")
-      .named("cssResources")
+      .named("jsoupCssResources")
   }
 
   protected def embeddedResources(page: Document): Source[WebResource, NotUsed] = {
@@ -75,7 +77,7 @@ class JsoupWebResourceFetcher(implicit client: WebClient, mat: Materializer) ext
 
     def toResource(_url: String): WebResource = new WebResource {
       val absUrl = URLUtils.resolveUrl(page.location(), _url)
-      def dataStream: Source[ByteString, NotUsed] = client.openDataStream(absUrl)
+      def dataStream: Source[ByteString, NotUsed] = getByteStream(absUrl)
       def url: String = _url
     }
 
@@ -84,7 +86,7 @@ class JsoupWebResourceFetcher(implicit client: WebClient, mat: Materializer) ext
     val audios = mediaSrcsOf(page.getElementsByTag("audios"))
     val scripts = srcsOf(page.getElementsByTag("script"))
     val links = hrefsOf(page.getElementsByTag("link"))
-    val anchored = hrefsOf(page.getElementsByTag("a")).filter(URLUtils.isStdMediaResource)
+    val anchored = hrefsOf(page.getElementsByTag("a")).filter(isSaveableResource)
 
     val urls = (images ++ videos ++ audios ++ scripts ++ links ++ anchored)
       .filter(url ⇒ url.nonEmpty && !URLUtils.isHashURL(url))
@@ -92,6 +94,16 @@ class JsoupWebResourceFetcher(implicit client: WebClient, mat: Materializer) ext
 
     Source(urls.distinct.map(toResource))
       .log("embedded-resources")
-      .named("embeddedResources")
+      .named("jsoupEmbeddedResources")
+  }
+  
+  protected def isSaveableResource(url: String) = {
+    URLUtils.hasExtension(url, config.saveExtensions)
+  }
+
+  protected def getByteStream(url: String) = {
+    client.openDataStream(url)
+      .via(StreamUtils.applyConfig)
+      .named("jsoupByteStream")
   }
 }

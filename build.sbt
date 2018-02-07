@@ -4,7 +4,7 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.12.3",
   crossScalaVersions := Seq("2.11.11", scalaVersion.value),
   organization := "com.github.karasiq",
-  version := "1.0.5",
+  version := "1.0.6-SNAPSHOT",
   isSnapshot := version.value.endsWith("-SNAPSHOT")
 )
 
@@ -75,7 +75,7 @@ lazy val core = project
     publishSettings,
     name := baseName,
     libraryDependencies ++=
-      ProjectDeps.akka.streams ++ ProjectDeps.akka.http ++ ProjectDeps.jsoup ++
+      ProjectDeps.akka.streams ++ ProjectDeps.akka.http ++ ProjectDeps.jsoup ++ ProjectDeps.commonsConfigs ++
       (ProjectDeps.scalaTest ++ ProjectDeps.akka.testKit).map(_ % "test")
   )
 
@@ -94,7 +94,7 @@ lazy val libs = (project in file("target") / "libs")
 
 lazy val app = project
   .settings(commonSettings, packageSettings, noPublishSettings, name := s"$baseName-app")
-  .dependsOn(core)
+  .dependsOn(core, htmlunit)
   .enablePlugins(JavaAppPackaging, WindowsPlugin /*, ClasspathJarPlugin, JDKPackagerPlugin*/)
   
 lazy val webzinc = (project in file("."))

@@ -15,7 +15,7 @@ private[webzinc] object URLUtils {
     url.startsWith("//") || url.contains("://") || url.startsWith("javascript:")
   }
 
-  def resolveUrl(baseUrl: String, relUrl: String) = {
+  def resolveUrl(baseUrl: String, relUrl: String): String = {
     if (relUrl.contains("://")) {
       relUrl
     } else {
@@ -25,11 +25,15 @@ private[webzinc] object URLUtils {
     }
   }
 
-  def isStdMediaResource(url: String) = {
+  def hasExtension(url: String, extensions: Set[String]): Boolean = {
     val extension = {
       val dotIndex = url.lastIndexOf('.')
       if (dotIndex == -1) "" else url.substring(dotIndex + 1)
     }
-    MediaExtensions.contains(extension)
+    extensions.contains(extension)
+  }
+
+  def isStdMediaResource(url: String) = {
+    hasExtension(url, MediaExtensions)
   }
 }

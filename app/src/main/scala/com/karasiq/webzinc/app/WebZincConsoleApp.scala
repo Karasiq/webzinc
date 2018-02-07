@@ -10,15 +10,17 @@ import scala.language.postfixOps
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 
-import com.karasiq.webzinc.{WebClient, WebResourceFetcher, WebResourceInliner}
+import com.karasiq.webzinc.WebResourceInliner
+import com.karasiq.webzinc.config.WebZincConfig
+import com.karasiq.webzinc.impl.htmlunit.HtmlUnitWebResourceFetcher
 import com.karasiq.webzinc.utils.WebZincUtils
 
 object WebZincConsoleApp extends App {
   implicit val actorSystem = ActorSystem()
   implicit val materializer = ActorMaterializer()
 
-  implicit val client = WebClient()
-  val fetcher = WebResourceFetcher()
+  implicit val config = WebZincConfig()
+  val fetcher = HtmlUnitWebResourceFetcher()
   val inliner = WebResourceInliner()
 
   try {
