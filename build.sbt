@@ -1,11 +1,35 @@
 val baseName = "webzinc"
 
+// -----------------------------------------------------------------------
+// Settings
+// -----------------------------------------------------------------------
 lazy val commonSettings = Seq(
   scalaVersion := "2.12.3",
   crossScalaVersions := Seq("2.11.11", scalaVersion.value),
   organization := "com.github.karasiq",
-  version := "1.0.6",
-  isSnapshot := version.value.endsWith("-SNAPSHOT")
+  // version := "1.0.6",
+  isSnapshot := version.value.endsWith("-SNAPSHOT"),
+  releaseCrossBuild := true,
+  releasePublishArtifactsAction := PgpKeys.publishSigned.value,
+  releaseProcess := {
+    import ReleaseKeys._
+    import ReleaseTransformations._
+
+    Seq[ReleaseStep](
+      checkSnapshotDependencies,
+      inquireVersions,
+      runClean,
+      runTest,
+      setReleaseVersion,
+      commitReleaseVersion,
+      tagRelease,
+      publishArtifacts,
+      releaseStepCommand("sonatypeRelease"),
+      setNextVersion,
+      commitNextVersion,
+      pushChanges
+    )
+  }
 )
 
 lazy val packageSettings = Seq(
@@ -69,6 +93,9 @@ lazy val noPublishSettings = Seq(
   publishTo := Some(Resolver.file("Repo", file("target/repo")))
 )
 
+// -----------------------------------------------------------------------
+// Projects
+// -----------------------------------------------------------------------
 lazy val core = project
   .settings(
     commonSettings,
@@ -88,10 +115,6 @@ lazy val htmlunit = project
   )
   .dependsOn(core % "compile->compile;test->test")
 
-lazy val libs = (project in file("target") / "libs")
-  .settings(commonSettings, noPublishSettings, name := s"$baseName-libs")
-  .aggregate(core, htmlunit)
-
 lazy val app = project
   .settings(commonSettings, packageSettings, noPublishSettings, name := s"$baseName-app")
   .dependsOn(core, htmlunit)
@@ -99,4 +122,4 @@ lazy val app = project
   
 lazy val webzinc = (project in file("."))
   .settings(commonSettings, noPublishSettings, name := s"$baseName-root")
-  .aggregate(app)
+  .aggregate(core, htmlunit)
