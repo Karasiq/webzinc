@@ -9,7 +9,7 @@ import com.typesafe.config.ConfigFactory
 import com.karasiq.common.configs.ConfigImplicits._
 import com.karasiq.webzinc.utils.URLUtils
 
-final case class WebZincConfig(proxy: Option[String], sizeLimit: Long, saveExtensions: Set[String], readTimeout: FiniteDuration)
+final case class WebZincConfig(proxy: Option[String], pageSizeLimit: Long, fileSizeLimit: Long, saveExtensions: Set[String], readTimeout: FiniteDuration)
 
 object WebZincConfig {
   lazy val default = loadConfig(ConfigFactory.load())
@@ -17,7 +17,8 @@ object WebZincConfig {
   def apply(config: Config): WebZincConfig = {
     new WebZincConfig(
       config.optional(_.getString("proxy")).filter(_.nonEmpty),
-      config.withDefault(Long.MaxValue, _.getBytes("size-limit")),
+      config.withDefault(Long.MaxValue, _.getBytes("page-size-limit")),
+      config.withDefault(Long.MaxValue, _.getBytes("file-size-limit")),
       config.withDefault(URLUtils.MediaExtensions, _.getStringSet("save-extensions")),
       config.withDefault(10 seconds, _.getFiniteDuration("read-timeout"))
     )

@@ -6,16 +6,17 @@ import akka.util.ByteString
 import org.jsoup.Jsoup
 
 import com.karasiq.webzinc.WebResourceInliner
+import com.karasiq.webzinc.config.WebZincConfig
 import com.karasiq.webzinc.model.{WebPage, WebResources}
 import com.karasiq.webzinc.utils.JSInlinerScript
 
 object JsoupJSWebResourceInliner {
-  def apply()(implicit mat: Materializer): JsoupJSWebResourceInliner = {
+  def apply()(implicit config: WebZincConfig, mat: Materializer): JsoupJSWebResourceInliner = {
     new JsoupJSWebResourceInliner
   }
 }
 
-class JsoupJSWebResourceInliner(implicit mat: Materializer) extends WebResourceInliner {
+class JsoupJSWebResourceInliner(implicit config: WebZincConfig, mat: Materializer) extends WebResourceInliner {
   protected def insertScript(html: String, script: String): String = {
     val parsedPage = Jsoup.parse(html)
     val scripts = parsedPage.head().getElementsByTag("script")
@@ -45,6 +46,17 @@ class JsoupJSWebResourceInliner(implicit mat: Materializer) extends WebResourceI
           .recoverWithRetries(3, { case _ ⇒ stream })
           .recoverWithRetries(1, { case _ ⇒ Source.empty })
       })
+      .statefulMapConcat { () ⇒
+        var bytesCount = 0L
+        (vs: (String, ByteString)) ⇒ {
+          if (bytesCount >= config.pageSizeLimit) {
+            Nil
+          } else {
+            bytesCount += vs._2.length
+            vs :: Nil
+          }
+        }
+      }
       .withAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
       .log("fetched-resources", { case (url, data) ⇒ url + " (" + data.length + " bytes)"})
       .named("resourceBytes")

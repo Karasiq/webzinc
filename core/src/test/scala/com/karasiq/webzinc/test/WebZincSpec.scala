@@ -30,7 +30,7 @@ abstract class WebZincSpec extends StandardSpec {
     "WebResourceFetcher" should "fetch resources" in {
       val (page, resourcesStream) = rf.getWebPage("https://electronics.stackexchange.com/questions/354665/do-pcbs-have-schematics").futureValue
       page.url shouldBe "https://electronics.stackexchange.com/questions/354665/do-pcbs-have-schematics"
-      page.title shouldBe "power electronics - Do PCBs have schematics? - Electrical Engineering Stack Exchange"
+      page.title shouldBe "pcb design - Do PCBs have schematics? - Electrical Engineering Stack Exchange"
       page.html.length should be >= 20000
 
       val resources = resourcesStream.runWith(Sink.seq).futureValue.map(_.url)

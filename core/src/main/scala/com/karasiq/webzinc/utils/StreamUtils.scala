@@ -26,7 +26,7 @@ private[webzinc] object StreamUtils {
 
   def applyConfig(implicit config: WebZincConfig): BytesFlow = {
     Flow[ByteString]
-      .via(limitBytes(config.sizeLimit))
+      .via(limitBytes(config.fileSizeLimit))
       .idleTimeout(config.readTimeout)
   }
 }
