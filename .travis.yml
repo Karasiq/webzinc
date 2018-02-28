@@ -5,5 +5,5 @@ scala:
 jdk:
   - oraclejdk8
 script:
-  - sbt ++$TRAVIS_SCALA_VERSION compile libs/test
+  - sbt ++$TRAVIS_SCALA_VERSION compile test
 sudo: false
