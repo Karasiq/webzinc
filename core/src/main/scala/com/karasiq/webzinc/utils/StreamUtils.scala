@@ -1,7 +1,5 @@
 package com.karasiq.webzinc.utils
 
-import java.io.IOException
-
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
@@ -17,7 +15,7 @@ private[webzinc] object StreamUtils {
         var read = 0L
         bytes ⇒ {
           read += bytes.length
-          if (read > limit) throw new IOException("Read limit exceeded")
+          if (read > limit) throw new RuntimeException("Read limit exceeded")
           bytes :: Nil
         }
       }

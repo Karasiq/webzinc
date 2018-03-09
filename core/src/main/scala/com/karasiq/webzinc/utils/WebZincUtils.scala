@@ -9,7 +9,7 @@ object WebZincUtils {
       forbiddenChars.replaceAllIn(str, "_")
     }
 
-    s"${validFileName(page.title)} [${Integer.toHexString(page.url.hashCode)}].html"
+    s"${validFileName(page.title).take(200)} [${Integer.toHexString(page.url.hashCode)}].html"
   }
 
   def getFileName(page: WebPage) = {

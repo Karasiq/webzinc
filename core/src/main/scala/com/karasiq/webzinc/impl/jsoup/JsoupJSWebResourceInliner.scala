@@ -1,10 +1,13 @@
 package com.karasiq.webzinc.impl.jsoup
 
+import java.io.IOException
+
 import akka.stream.{ActorAttributes, Materializer, Supervision}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import org.jsoup.Jsoup
 
+import com.karasiq.common.memory.MemorySize
 import com.karasiq.webzinc.WebResourceInliner
 import com.karasiq.webzinc.config.WebZincConfig
 import com.karasiq.webzinc.model.{WebPage, WebResources}
@@ -43,22 +46,24 @@ class JsoupJSWebResourceInliner(implicit config: WebZincConfig, mat: Materialize
           .map((resource.url, _))
 
         stream
-          .recoverWithRetries(3, { case _ ⇒ stream })
+          .recoverWithRetries(2, { case _: IOException ⇒ stream })
           .recoverWithRetries(1, { case _ ⇒ Source.empty })
       })
       .statefulMapConcat { () ⇒
         var bytesCount = 0L
         (vs: (String, ByteString)) ⇒ {
           if (bytesCount >= config.pageSizeLimit) {
-            Nil
+            None :: Nil
           } else {
             bytesCount += vs._2.length
-            vs :: Nil
+            Some(vs) :: Nil
           }
         }
       }
+      .takeWhile(_.nonEmpty)
+      .mapConcat(_.toVector)
       .withAttributes(ActorAttributes.supervisionStrategy(Supervision.resumingDecider))
-      .log("fetched-resources", { case (url, data) ⇒ url + " (" + data.length + " bytes)"})
+      .log("fetched-resources", { case (url, data) ⇒ url + " (" + MemorySize(data.length) + ")"})
       .named("resourceBytes")
 
     Source.single(JSInlinerScript.header(page))
