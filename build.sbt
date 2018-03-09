@@ -25,6 +25,7 @@ lazy val commonSettings = Seq(
       releaseStepCommand("sonatypeRelease"),
       releaseStepCommand("app/universal:packageBin"),
       releaseStepCommand("app/windows:packageBin"),
+      releaseStepCommand("app/githubRelease"),
       commitReleaseVersion,
       tagRelease,
       setNextVersion,
@@ -60,7 +61,15 @@ lazy val packageSettings = Seq(
   packageSummary := "webzinc",
   packageDescription := """WebZinc application.""",
   wixProductId := "75bc6d56-5775-4a07-a006-1b1c75aefc3e",
-  wixProductUpgradeId := "5cc0ee85-0c77-4059-9ea0-6b872b7739bd"
+  wixProductUpgradeId := "5cc0ee85-0c77-4059-9ea0-6b872b7739bd",
+  ghreleaseRepoOrg := "Karasiq",
+  ghreleaseRepoName := baseName,
+  ghreleaseAssets := Seq(
+    target.value / "universal" / s"$baseName-app-${version.value}.zip",
+    target.value / "windows" / s"$baseName-app.msi"
+  ),
+  ghreleaseTitle := { tagName ⇒ tagName.toString },
+  ghreleaseNotes := { _ ⇒ "" }
 )
 
 lazy val publishSettings = Seq(
