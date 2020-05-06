@@ -22,7 +22,7 @@ abstract class WebZincSpec extends StandardSpec {
       // println(entity.data.utf8String)
       response.headers.collect { case `Content-Type`(contentType) ⇒ contentType.mediaType shouldBe MediaTypes.`text/html` }
       // entity.contentLength shouldBe 606
-      entity.data.length shouldBe 1270
+      entity.data.length shouldBe 1256
     }
   }
 
@@ -35,7 +35,7 @@ abstract class WebZincSpec extends StandardSpec {
 
       val resources = resourcesStream.runWith(Sink.seq).futureValue.map(_.url)
       resources should contain ("https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js")
-      resources should contain ("img/sprites.svg?v=54431cac5cfa")
+      resources should contain ("../../img/filter-sprites.png?v=25267dbcd657")
     }
   }
 
