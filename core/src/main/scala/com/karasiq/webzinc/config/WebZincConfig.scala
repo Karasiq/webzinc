@@ -30,9 +30,9 @@ object WebZincConfig {
         URLUtils.MediaExtensions,
         _.getStringSet("save-extensions")
       ),
-      config.withDefault(10 seconds, _.getFiniteDuration("read-timeout")),
+      config.withDefault(30 seconds, _.getFiniteDuration("read-timeout")),
       config.withDefault(8, _.getInt("parallelism")),
-      config.withDefault(0, _.getInt("retries"))
+      config.withDefault(2, _.getInt("retries"))
     )
   }
 

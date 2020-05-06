@@ -4,7 +4,7 @@ object ProjectDeps {
   type Deps = Seq[ModuleID]
 
   object akka {
-    val version = "2.5.2"
+    val version     = "2.5.2"
     val httpVersion = "10.0.9"
 
     def actors: Deps = Seq(
@@ -24,9 +24,9 @@ object ProjectDeps {
     )
 
     def testKit: Deps = Seq(
-      "com.typesafe.akka" %% "akka-testkit" % version,
+      "com.typesafe.akka" %% "akka-testkit"        % version,
       "com.typesafe.akka" %% "akka-stream-testkit" % version,
-      "com.typesafe.akka" %% "akka-http-testkit" % httpVersion
+      "com.typesafe.akka" %% "akka-http-testkit"   % httpVersion
     )
 
     def slf4j: Deps = Seq(
@@ -51,7 +51,7 @@ object ProjectDeps {
   )
 
   def htmlUnit: Deps = Seq(
-    "net.sourceforge.htmlunit" % "htmlunit" % "2.27"
+    "net.sourceforge.htmlunit" % "htmlunit" % "2.40.0"
   )
 
   def jsoup: Deps = Seq(
@@ -60,5 +60,9 @@ object ProjectDeps {
 
   def apacheCommonsIO: Deps = Seq(
     "commons-io" % "commons-io" % "2.6"
+  )
+
+  def guava: Deps = Seq(
+    "com.google.guava" % "guava" % "29.0-jre"
   )
 }

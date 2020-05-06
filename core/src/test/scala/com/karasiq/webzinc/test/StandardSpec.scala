@@ -13,12 +13,12 @@ import org.scalatest.concurrent.ScalaFutures
 abstract class StandardSpec extends TestKit(ActorSystem("test")) with ImplicitSender
   with Suite with Matchers with ScalaFutures with BeforeAndAfterAll with FlatSpecLike {
 
-  implicit val defaultTimeout = Timeout(15 seconds)
+  implicit val defaultTimeout = Timeout(30 seconds)
   implicit val materializer = ActorMaterializer()
   implicit val executionContext = system.dispatcher
 
   override implicit val patienceConfig: PatienceConfig = {
-    PatienceConfig(30 seconds, 300 millis)
+    PatienceConfig(defaultTimeout.duration, 300 millis)
   }
 
   override protected def afterAll(): Unit = {

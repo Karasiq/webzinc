@@ -1,20 +1,19 @@
 package com.karasiq.webzinc.impl.jsoup
 
-import scala.collection.JavaConverters._
-import scala.concurrent.Future
-
 import akka.NotUsed
-import akka.stream.{ActorAttributes, Materializer, Supervision}
 import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.{ActorAttributes, Materializer, Supervision}
 import akka.util.ByteString
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
-import org.jsoup.select.Elements
-
-import com.karasiq.webzinc.{WebClient, WebResourceFetcher}
 import com.karasiq.webzinc.config.WebZincConfig
 import com.karasiq.webzinc.model.{WebPage, WebResource, WebResources}
 import com.karasiq.webzinc.utils.{CSSUtils, StreamUtils, URLUtils}
+import com.karasiq.webzinc.{WebClient, WebResourceFetcher}
+import org.jsoup.Jsoup
+import org.jsoup.nodes.{Document, Element, Node}
+import org.jsoup.select.Elements
+
+import scala.collection.JavaConverters._
+import scala.concurrent.Future
 
 object JsoupWebResourceFetcher {
   def apply()(implicit config: WebZincConfig, client: WebClient, mat: Materializer): JsoupWebResourceFetcher = {
@@ -85,7 +84,7 @@ class JsoupWebResourceFetcher(implicit config: WebZincConfig, client: WebClient,
     val videos = mediaSrcsOf(page.getElementsByTag("video"))
     val audios = mediaSrcsOf(page.getElementsByTag("audios"))
     val scripts = srcsOf(page.getElementsByTag("script"))
-    val links = hrefsOf(page.getElementsByTag("link"))
+    val links = hrefsOf(page.select("link[rel *= 'stylesheet'], tag[rel *= 'icon']"))
     val anchored = hrefsOf(page.getElementsByTag("a")).filter(isSaveableResource)
 
     val urls = (images ++ videos ++ audios ++ scripts ++ links ++ anchored)
@@ -93,7 +92,7 @@ class JsoupWebResourceFetcher(implicit config: WebZincConfig, client: WebClient,
       .toVector
 
     Source(urls.distinct.map(toResource))
-      .log("embedded-resources")
+      // .log("embedded-resources")
       .named("jsoupEmbeddedResources")
   }
   

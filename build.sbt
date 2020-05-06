@@ -7,8 +7,6 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.12.3",
   crossScalaVersions := Seq("2.11.11", scalaVersion.value),
   organization := "com.github.karasiq",
-  // version := "1.0.6",
-  isSnapshot := version.value.endsWith("-SNAPSHOT"),
   releaseCrossBuild := true,
   releasePublishArtifactsAction := PgpKeys.publishSigned.value,
   releaseProcess := {
@@ -23,7 +21,7 @@ lazy val commonSettings = Seq(
       setReleaseVersion,
       publishArtifacts,
       releaseStepCommand("app/universal:packageBin"),
-      releaseStepCommand("app/githubRelease"),
+      // releaseStepCommand("app/githubRelease"),
       releaseStepCommand("sonatypeRelease"),
       commitReleaseVersion,
       tagRelease,
@@ -41,8 +39,8 @@ lazy val packageSettings = Seq(
   executableScriptName := baseName,
   mappings in Universal := {
     val universalMappings = (mappings in Universal).value
-    val fatJar = (assembly in Compile).value
-    val filtered = universalMappings.filterNot(_._2.endsWith(".jar"))
+    val fatJar            = (assembly in Compile).value
+    val filtered          = universalMappings.filterNot(_._2.endsWith(".jar"))
     filtered :+ (fatJar → ("lib/" + fatJar.getName))
   },
   test in assembly := {},
@@ -64,11 +62,15 @@ lazy val packageSettings = Seq(
   ghreleaseRepoOrg := "Karasiq",
   ghreleaseRepoName := baseName,
   ghreleaseAssets := Seq(
-    target.value / "universal" / s"$baseName-app-${version.value}.zip",
+    target.value / "universal" / s"$baseName-app-${version.value}.zip"
     // target.value / "windows" / s"$baseName-app.msi"
   ),
-  ghreleaseTitle := { tagName ⇒ tagName.toString },
-  ghreleaseNotes := { _ ⇒ "" }
+  ghreleaseTitle := { tagName ⇒
+    tagName.toString
+  },
+  ghreleaseNotes := { _ ⇒
+    ""
+  }
 )
 
 lazy val publishSettings = Seq(
@@ -81,7 +83,9 @@ lazy val publishSettings = Seq(
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
   },
   publishArtifact in Test := false,
-  pomIncludeRepository := { _ ⇒ false },
+  pomIncludeRepository := { _ ⇒
+    false
+  },
   licenses := Seq("Apache License, Version 2.0" → url("http://opensource.org/licenses/Apache-2.0")),
   homepage := Some(url(s"https://github.com/Karasiq/$baseName")),
   pomExtra := <scm>
@@ -100,7 +104,11 @@ lazy val publishSettings = Seq(
 lazy val noPublishSettings = Seq(
   publishArtifact := false,
   publishArtifact in makePom := false,
-  publishTo := Some(Resolver.file("Repo", file("target/repo")))
+  publishTo := Some(Resolver.file("Repo", file("target/repo"))),
+  publishLocal := {},
+  publish := {},
+  PgpKeys.publishSigned := {},
+  PgpKeys.publishLocalSigned := {},
 )
 
 // -----------------------------------------------------------------------
@@ -112,8 +120,8 @@ lazy val core = project
     publishSettings,
     name := baseName,
     libraryDependencies ++=
-      ProjectDeps.akka.streams ++ ProjectDeps.akka.http ++ ProjectDeps.jsoup ++ ProjectDeps.commonsConfigs ++
-      (ProjectDeps.scalaTest ++ ProjectDeps.akka.testKit).map(_ % "test")
+      ProjectDeps.akka.streams ++ ProjectDeps.akka.http ++ ProjectDeps.jsoup ++ ProjectDeps.commonsConfigs ++ ProjectDeps.guava ++
+        (ProjectDeps.scalaTest ++ ProjectDeps.akka.testKit).map(_ % "test")
   )
 
 lazy val htmlunit = project
@@ -128,8 +136,8 @@ lazy val htmlunit = project
 lazy val app = project
   .settings(commonSettings, packageSettings, noPublishSettings, name := s"$baseName-app")
   .dependsOn(core, htmlunit)
-  .enablePlugins(JavaAppPackaging, WindowsPlugin /*, ClasspathJarPlugin, JDKPackagerPlugin*/)
-  
+  .enablePlugins(JavaAppPackaging, WindowsPlugin /*, ClasspathJarPlugin, JDKPackagerPlugin*/ )
+
 lazy val webzinc = (project in file("."))
   .settings(commonSettings, noPublishSettings, name := s"$baseName-root")
   .aggregate(core, htmlunit)

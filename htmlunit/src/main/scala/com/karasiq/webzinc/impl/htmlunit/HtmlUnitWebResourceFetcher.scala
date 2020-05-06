@@ -1,64 +1,90 @@
 package com.karasiq.webzinc.impl.htmlunit
 
 import java.net.URL
+import java.nio.charset.StandardCharsets
+
+import akka.NotUsed
+import akka.actor.ActorSystem
+import akka.event.Logging
+import akka.stream.scaladsl.{Sink, Source, StreamConverters}
+import akka.stream.{ActorAttributes, Materializer, Supervision}
+import akka.util.ByteString
+import com.gargoylesoftware.htmlunit
+import com.gargoylesoftware.htmlunit._
+import com.gargoylesoftware.htmlunit.html._
+import com.gargoylesoftware.htmlunit.util.NameValuePair
+import com.karasiq.common.ThreadLocalFactory
+import com.karasiq.networkutils.HtmlUnitUtils
+import com.karasiq.webzinc.config.WebZincConfig
+import com.karasiq.webzinc.model.{WebPage, WebResource}
+import com.karasiq.webzinc.utils._
+import com.karasiq.webzinc.{WebClient, WebResourceFetcher}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.postfixOps
 
-import akka.NotUsed
-import akka.stream.{ActorAttributes, Materializer, Supervision}
-import akka.stream.scaladsl.{Sink, Source, StreamConverters}
-import akka.util.ByteString
-import com.gargoylesoftware.htmlunit.{HttpMethod, Page, WebResponse, WebResponseData}
-import com.gargoylesoftware.htmlunit.html._
-import com.gargoylesoftware.htmlunit.util.NameValuePair
-
-import com.karasiq.networkutils.HtmlUnitUtils
-import com.karasiq.webzinc.{WebClient, WebResourceFetcher}
-import com.karasiq.webzinc.config.WebZincConfig
-import com.karasiq.webzinc.model.{WebPage, WebResource}
-import com.karasiq.webzinc.utils.{CSSUtils, StreamAttrs, StreamUtils, URLUtils}
-
 object HtmlUnitWebResourceFetcher {
-  def apply(js: Boolean = false, externalClient: Option[WebClient] = None)(implicit config: WebZincConfig, ec: ExecutionContext, mat: Materializer): HtmlUnitWebResourceFetcher = {
+  def apply(
+      js: Boolean = false,
+      externalClient: Option[WebClient] = None
+  )(implicit config: WebZincConfig, ec: ExecutionContext, mat: Materializer, as: ActorSystem): HtmlUnitWebResourceFetcher = {
     new HtmlUnitWebResourceFetcher(js, externalClient)
   }
 }
 
-class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])(implicit config: WebZincConfig, ec: ExecutionContext, mat: Materializer) extends WebResourceFetcher {
+class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])(
+    implicit config: WebZincConfig,
+    ec: ExecutionContext,
+    mat: Materializer,
+    as: ActorSystem
+) extends WebResourceFetcher
+    with Measure {
+  protected val log = Logging(as, getClass)
+
   import HtmlUnitUtils._
-  protected val webClient = newWebClient(js)
 
-  def getWebPage(url: String) = getPage(url).collect { case htmlPage: HtmlPage ⇒
-    val pageResource = WebPage(url, htmlPage.getTitleText, htmlPage.getWebResponse.getContentAsString())
-    val resources = embeddedResources(htmlPage).concat(cssResources(htmlPage))
-    (pageResource, resources)
+  protected val cache = new Cache
+  cache.setMaxSize(200)
+
+  protected val webClient = ThreadLocalFactory(newWebClient(js, cache = cache), (_: htmlunit.WebClient).close())
+
+  def getWebPage(url: String) = getPage(url).collect {
+    case htmlPage: HtmlPage ⇒
+      log.info("Page loaded: {}", htmlPage)
+      val pageResource = WebPage(url, htmlPage.getTitleText, htmlPage.getWebResponse.getContentAsString())
+      val resources    = embeddedResources(htmlPage).concat(cssResources(htmlPage))
+      (pageResource, resources)
   }
 
-  protected def getPage(url: String): Future[Page] = externalClient match {
-    case Some(client) ⇒
-      for {
-        response ← client.doHttpRequest(url)
-        entity ← response.entity.toStrict(config.readTimeout)
-      } yield {
-        val pageCreator = webClient.getPageCreator
-        val headers = response.headers.map(h ⇒ new NameValuePair(h.name(), h.value()))
-          .filterNot(p ⇒ p.getName == "Content-Encoding" || p.getName == "Content-Length")
-          .asJava
-        val responseData = new WebResponseData(entity.data.toArray, response.status.intValue(), response.status.reason(), headers)
-        pageCreator.createPage(new WebResponse(responseData, new URL(url), HttpMethod.GET, 100L), webClient.getCurrentWindow)
+  protected def getPage(url: String): Future[Page] =
+    measureFuture(
+      s"Loading page $url",
+      externalClient match {
+        case Some(client) ⇒
+          for {
+            response ← client.doHttpRequest(url)
+            entity   ← response.entity.toStrict(config.readTimeout)
+          } yield {
+            val pageCreator  = webClient().getPageCreator
+            val headers      = response.headers.map(h ⇒ new NameValuePair(h.name(), h.value())).asJava
+            val responseData = new WebResponseData(entity.data.toArray, response.status.intValue(), response.status.reason(), headers)
+            val webRequest   = new WebRequest(new URL(url), HttpMethod.GET)
+            webRequest.setCharset(StandardCharsets.UTF_8)
+            val webResponse = new WebResponse(responseData, webRequest, 1000)
+            pageCreator.createPage(webResponse, webClient().getCurrentWindow)
+          }
+
+        case None ⇒
+          Future(webClient().getPage[Page](url))
       }
-
-    case None ⇒
-      Future(webClient.getPage[Page](url))
-  }
+    )
 
   protected def embeddedResources(page: HtmlPage) = {
     def toResource(_url: String): WebResource = {
       val fullUrl = page.getFullyQualifiedUrl(_url).toString
       new WebResource {
-        def url: String = _url
+        def url: String                             = _url
         def dataStream: Source[ByteString, NotUsed] = getByteStream(fullUrl)
       }
     }
@@ -71,16 +97,23 @@ class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])
       audio.getAttribute("src") :: audio.subElementsByTagName[HtmlSource]("source").map(_.getAttribute("src")).toList
     }
 
-    val scripts = page.elementsByTagName[HtmlScript]("script").map(_.getSrcAttribute)
-    val linked = page.elementsByTagName[HtmlLink]("link").map(_.getHrefAttribute)
+    val scripts  = page.elementsByTagName[HtmlScript]("script").map(_.getSrcAttribute)
     val anchored = page.anchors.map(_.getHrefAttribute).filter(isSaveableResource)
+    val linked = page
+      .elementsByTagName[HtmlLink]("link")
+      .filter { link =>
+        val rel      = link.getRelAttribute
+        val relevant = Seq("stylesheet", "icon")
+        relevant.exists(rel.contains)
+      }
+      .map(_.getHrefAttribute)
 
     val urls = (images ++ videos ++ audios ++ scripts ++ linked ++ anchored)
       .filter(url ⇒ url.nonEmpty && !URLUtils.isHashURL(url))
       .toVector
 
     Source(urls.distinct.map(toResource))
-      .log("embedded-resources")
+    //.log("embedded-resources")
       .named("htmlunitEmbeddedResources")
   }
 
@@ -92,7 +125,7 @@ class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])
         val fullUrl = if (URLUtils.isAbsoluteURL(_url)) _url else baseUrl.resolve(_url).toString
 
         new WebResource {
-          def url: String = _url
+          def url: String                             = _url
           def dataStream: Source[ByteString, NotUsed] = getByteStream(fullUrl)
         }
       }
@@ -100,11 +133,13 @@ class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])
       urls.map(cssResource)
     }
 
-    val staticStyles = page.elementsByTagName[HtmlStyle]("style")
+    val staticStyles = page
+      .elementsByTagName[HtmlStyle]("style")
       .map(_.asText())
       .toVector
 
-    val linkedStyles = page.elementsByTagName[HtmlLink]("link")
+    val linkedStyles = page
+      .elementsByTagName[HtmlLink]("link")
       .filter(_.getRelAttribute.contains("stylesheet"))
       .map(_.fullUrl(_.getHrefAttribute))
       .toVector
@@ -129,10 +164,12 @@ class HtmlUnitWebResourceFetcher(js: Boolean, externalClient: Option[WebClient])
         client.openDataStream(url)
 
       case None ⇒
-        Source.single(url).flatMapConcat { url ⇒
-          val page = webClient.getPage[Page](url)
-          StreamConverters.fromInputStream(() ⇒ page.getWebResponse.getContentAsStream)
-            .alsoTo(Sink.onComplete(_ ⇒ page.cleanUp()))
+        Source.single(url).async.flatMapConcat { url ⇒
+          StreamConverters
+            .fromInputStream { () ⇒
+              val page = webClient().getPage[Page](url)
+              page.getWebResponse.getContentAsStream
+            }
             .withAttributes(StreamAttrs.useProvidedOrBlockingDispatcher)
         }
     }

@@ -11,7 +11,7 @@ import com.karasiq.webzinc.{WebClient, WebResourceFetcher, WebResourceInliner}
 import com.karasiq.webzinc.config.WebZincConfig
 
 abstract class WebZincSpec extends StandardSpec {
-  implicit val config = WebZincConfig()
+  implicit val config = WebZincConfig().copy(retries = 10)
   
   def testWebClient(wc: WebClient): Unit = {
     "WebClient" should "save page" in {
@@ -35,7 +35,7 @@ abstract class WebZincSpec extends StandardSpec {
 
       val resources = resourcesStream.runWith(Sink.seq).futureValue.map(_.url)
       resources should contain ("https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js")
-      resources should contain ("../../img/filter-sprites.png?v=25267dbcd657")
+      atLeast(1, resources) should fullyMatch regex ("\\.\\./\\.\\./Img/progress-dots\\.gif\\?v=[\\w\\d]+".r)
     }
   }
 
