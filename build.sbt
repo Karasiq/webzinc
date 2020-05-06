@@ -22,10 +22,9 @@ lazy val commonSettings = Seq(
       runTest,
       setReleaseVersion,
       publishArtifacts,
-      releaseStepCommand("sonatypeRelease"),
       releaseStepCommand("app/universal:packageBin"),
-      releaseStepCommand("app/windows:packageBin"),
       releaseStepCommand("app/githubRelease"),
+      releaseStepCommand("sonatypeRelease"),
       commitReleaseVersion,
       tagRelease,
       setNextVersion,
@@ -66,7 +65,7 @@ lazy val packageSettings = Seq(
   ghreleaseRepoName := baseName,
   ghreleaseAssets := Seq(
     target.value / "universal" / s"$baseName-app-${version.value}.zip",
-    target.value / "windows" / s"$baseName-app.msi"
+    // target.value / "windows" / s"$baseName-app.msi"
   ),
   ghreleaseTitle := { tagName ⇒ tagName.toString },
   ghreleaseNotes := { _ ⇒ "" }
